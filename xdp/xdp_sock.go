@@ -19,15 +19,6 @@ func (socket XdpSock) ID() string {
 	return socket.id.String()
 }
 
-func (socket XdpSock) Stats() Stats {
-	stats, err := socket.sock.Stats()
-	if err != nil {
-		panic(err)
-	}
-
-	return Stats{stats.Filled, stats.Received, stats.Transmitted, stats.Completed, stats.KernelStats}
-}
-
 func CreateXdpSock(queue int, ifname string) XdpSock {
 
 	link, err := netlink.LinkByName(ifname)
@@ -44,7 +35,7 @@ func CreateXdpSock(queue int, ifname string) XdpSock {
 	return XdpSock{uuid.New(), *xsk, link, []xdp.Desc{}}
 }
 
-func (socket XdpSock) Receive() []Frame {
+func (socket XdpSock) Receive() []*Frame {
 	numRx, _, err := socket.sock.Poll(1)
 
 	if err != nil {
@@ -52,25 +43,28 @@ func (socket XdpSock) Receive() []Frame {
 	}
 
 	if numRx == 0 {
-		return []Frame{}
+		return []*Frame{}
 	}
 
 	rxDescs := socket.sock.Receive(numRx)
 	if len(rxDescs) > 0 {
-		frames := make([]Frame, 0, len(rxDescs))
+		frames := make([]*Frame, 0, len(rxDescs))
 		for i := 0; i < len(rxDescs); i++ {
 			framePointer := socket.sock.GetFrame(rxDescs[i])
 			macDest := string(framePointer[0:6])
 			macOrig := string(framePointer[6:12])
-			frame := Frame{framePointer, time.Now(), macOrig, macDest, rxDescs[i]}
+			buf := make([]byte, rxDescs[i].Len)
+			copy(buf, framePointer[:rxDescs[i].Len])
+			frame := &Frame{buf, time.Now(), macOrig, macDest}
 			frames = append(frames, frame)
 		}
+		socket.sock.Fill(rxDescs)
 		return frames
 	}
-	return []Frame{}
+	return []*Frame{}
 }
 
-func (socket XdpSock) SendFrame(frame Frame) {
+func (socket XdpSock) SendFrame(frame *Frame) {
 
 	_, _, err := socket.sock.Poll(1)
 
@@ -86,7 +80,7 @@ func (socket XdpSock) SendFrame(frame Frame) {
 	}
 }
 
-func (socket XdpSock) Send(frames []Frame) {
+func (socket XdpSock) Send(frames []*Frame) {
 	_, _, err := socket.sock.Poll(1)
 
 	if err != nil {
@@ -119,13 +113,4 @@ func (socket XdpSock) Close() {
 	if err != nil {
 		panic(err)
 	}
-}
-
-func (socket XdpSock) CleanFrameMem(frames []Frame) {
-	descs := make([]xdp.Desc, 0, len(frames))
-
-	for _, frame := range frames {
-		descs = append(descs, frame.umemAddr)
-	}
-	socket.sock.Fill(descs)
 }

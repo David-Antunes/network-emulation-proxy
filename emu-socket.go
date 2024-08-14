@@ -1,6 +1,7 @@
 package main
 
 import (
+	"gitea.homelab-antunes.duckdns.org/emu-socket/xdp"
 	"os"
 
 	unixsocket "gitea.homelab-antunes.duckdns.org/emu-socket/unix-socket"
@@ -8,7 +9,11 @@ import (
 
 func main() {
 	os.Remove("/tmp/emu.sock")
-	// Create a Unix domain socket and listen for incoming connections.
 	unixsocket.SetSocketPath("/tmp/emu.sock")
 	unixsocket.StartSocket()
+	outbound := xdp.CreateOutbound(unixsocket.GetReadChannel())
+	inbound := xdp.CreateInbound(unixsocket.GetWriteChannel(), outbound)
+
+	inbound.Start()
+	outbound.Start()
 }

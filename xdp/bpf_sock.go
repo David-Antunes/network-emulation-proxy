@@ -37,19 +37,15 @@ func (sock XdpBpfSock) ID() string {
 	return sock.xdp.ID()
 }
 
-func (sock XdpBpfSock) Stats() Stats {
-	return sock.xdp.Stats()
-}
-
-func (sock XdpBpfSock) SendFrame(frame Frame) {
+func (sock XdpBpfSock) SendFrame(frame *Frame) {
 	sock.xdp.SendFrame(frame)
 }
 
-func (sock XdpBpfSock) Send(frames []Frame) {
+func (sock XdpBpfSock) Send(frames []*Frame) {
 	sock.xdp.Send(frames)
 }
 
-func (sock XdpBpfSock) Receive() []Frame {
+func (sock XdpBpfSock) Receive() []*Frame {
 	return sock.xdp.Receive()
 }
 
@@ -62,8 +58,4 @@ func (sock XdpBpfSock) Close() {
 	if err != nil {
 		panic(err)
 	}
-}
-
-func (sock XdpBpfSock) CleanFrameMem(frames []Frame) {
-	sock.xdp.CleanFrameMem(frames)
 }

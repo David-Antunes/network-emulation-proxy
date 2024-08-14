@@ -2,8 +2,6 @@ package xdp
 
 import (
 	"time"
-
-	"github.com/asavie/xdp"
 )
 
 type Frame struct {
@@ -11,7 +9,15 @@ type Frame struct {
 	time           time.Time
 	macOrigin      string
 	macDestination string
-	umemAddr       xdp.Desc
+}
+
+func CreateFrame(framePointer []byte, time time.Time, macOrigin, macDestination string) *Frame {
+	return &Frame{
+		framePointer:   framePointer,
+		time:           time,
+		macOrigin:      macOrigin,
+		macDestination: macDestination,
+	}
 }
 
 func (frame *Frame) Time() time.Time {
@@ -31,8 +37,4 @@ func (frame *Frame) MacOrigin() string {
 }
 func (frame *Frame) MacDestination() string {
 	return frame.macDestination
-}
-
-func (frame *Frame) UmemAddr() xdp.Desc {
-	return frame.umemAddr
 }

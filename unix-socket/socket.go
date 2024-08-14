@@ -2,16 +2,18 @@ package unixsocket
 
 import (
 	"errors"
+	"gitea.homelab-antunes.duckdns.org/emu-socket/xdp"
 	"log"
 	"net"
 	"os"
+	"time"
 )
 
 type socket struct {
 	socketPath string
 	sock       net.Listener
-	read       chan []byte
-	write      chan []byte
+	read       chan *xdp.Frame
+	write      chan *xdp.Frame
 	conn       net.Conn
 	closed     bool
 }
@@ -19,10 +21,17 @@ type socket struct {
 var s = &socket{
 	socketPath: "",
 	sock:       nil,
-	read:       make(chan []byte),
-	write:      make(chan []byte),
+	read:       make(chan *xdp.Frame),
+	write:      make(chan *xdp.Frame),
 	conn:       nil,
 	closed:     false,
+}
+
+func GetReadChannel() chan *xdp.Frame {
+	return s.read
+}
+func GetWriteChannel() chan *xdp.Frame {
+	return s.write
 }
 
 func SetSocketPath(path string) {
@@ -54,7 +63,8 @@ func StartSocket() error {
 			if err != nil {
 				break
 			}
-			s.read <- buf
+
+			s.read <- xdp.CreateFrame(buf, time.Now(), "", "")
 		}
 	}
 }
@@ -62,8 +72,8 @@ func StartSocket() error {
 func sendMsg(conn net.Conn) {
 	for {
 		select {
-		case bytes := <-s.write:
-			_, err := conn.Write(bytes)
+		case frame := <-s.write:
+			_, err := conn.Write(frame.Frame())
 			if err != nil {
 				return
 			}
