@@ -69,7 +69,7 @@ func (outbound *Outbound) send() {
 			return
 
 		case frame := <-outbound.queue:
-			if socket, ok := outbound.sockets[frame.macDestination]; ok {
+			if socket, ok := outbound.sockets[frame.MacDestination]; ok {
 				socket.SendFrame(frame)
 			}
 

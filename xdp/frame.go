@@ -5,36 +5,36 @@ import (
 )
 
 type Frame struct {
-	framePointer   []byte
-	time           time.Time
-	macOrigin      string
-	macDestination string
+	FramePointer   []byte    `json:"framePointer"`
+	Time           time.Time `json:"time"`
+	MacOrigin      string    `json:"macOrigin"`
+	MacDestination string    `json:"macDestination"`
 }
 
 func CreateFrame(framePointer []byte, time time.Time, macOrigin, macDestination string) *Frame {
 	return &Frame{
-		framePointer:   framePointer,
-		time:           time,
-		macOrigin:      macOrigin,
-		macDestination: macDestination,
+		FramePointer:   framePointer,
+		Time:           time,
+		MacOrigin:      macOrigin,
+		MacDestination: macDestination,
 	}
 }
 
-func (frame *Frame) Time() time.Time {
-	return frame.time
+func (frame *Frame) GetTime() time.Time {
+	return frame.Time
 }
 
 func (frame *Frame) AddTime(time time.Duration) {
-	frame.time = frame.time.Add(time)
+	frame.Time = frame.Time.Add(time)
 }
 
 func (frame *Frame) Frame() []byte {
-	return frame.framePointer
+	return frame.FramePointer
 }
 
-func (frame *Frame) MacOrigin() string {
-	return frame.macOrigin
+func (frame *Frame) GetMacOrigin() string {
+	return frame.MacOrigin
 }
-func (frame *Frame) MacDestination() string {
-	return frame.macDestination
+func (frame *Frame) GetMacDestination() string {
+	return frame.MacDestination
 }

@@ -43,10 +43,6 @@ func CreateInbound(gateway chan *Frame, outbound *Outbound) *Inbound {
 	}
 }
 
-func (inbound *Inbound) createChannel() chan Frame {
-	return make(chan Frame, queueSize)
-}
-
 func (inbound *Inbound) AddSocket(iface string, socket Isocket) {
 	inbound.Lock()
 	if _, ok := inbound.sockets[iface]; !ok {
@@ -75,9 +71,9 @@ func (inbound *Inbound) pollSocket(socket Isocket) {
 		frames = socket.Receive()
 	}
 
-	inLog.Println("Found MAC address: ", net.HardwareAddr(frames[0].macOrigin))
+	inLog.Println("Found MAC address: ", net.HardwareAddr(frames[0].MacOrigin))
 
-	mac := frames[0].macOrigin
+	mac := frames[0].MacOrigin
 	inbound.outbound.AddMac(mac, socket)
 
 	for _, frame := range frames {

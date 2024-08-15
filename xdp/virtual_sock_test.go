@@ -14,9 +14,9 @@ func TestSendFrame(t *testing.T) {
 
 	frame := sock.Receive()[0]
 
-	if frame.macOrigin != string(mac_a) {
+	if frame.MacOrigin != string(mac_a) {
 		t.Fatal("Wrong origin mac!")
-	} else if frame.macDestination != string(mac_b) {
+	} else if frame.MacDestination != string(mac_b) {
 		t.Fatal("Wrong destination mac")
 	}
 }
@@ -74,7 +74,7 @@ func TestWithOutbound(t *testing.T) {
 
 	result := out_sock.ReceivedFrames[0]
 
-	if result.macOrigin != frame.macOrigin || result.macDestination != frame.macDestination {
+	if result.MacOrigin != frame.macOrigin || result.MacDestination != frame.macDestination {
 		t.Fatal("Frames don't match!")
 	}
 }

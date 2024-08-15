@@ -1,7 +1,7 @@
 package xdp
 
 import (
-	"github.com/asavie/xdp"
+	"github.com/david-antunes/xdp"
 )
 
 //var DefaultXdpFlags = int(unix.XDP_FLAGS_SKB_MODE)

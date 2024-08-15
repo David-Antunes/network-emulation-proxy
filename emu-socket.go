@@ -1,8 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"gitea.homelab-antunes.duckdns.org/emu-socket/xdp"
+	"net"
 	"os"
+	"time"
 
 	unixsocket "gitea.homelab-antunes.duckdns.org/emu-socket/unix-socket"
 )
@@ -10,10 +13,51 @@ import (
 func main() {
 	os.Remove("/tmp/emu.sock")
 	unixsocket.SetSocketPath("/tmp/emu.sock")
-	unixsocket.StartSocket()
 	outbound := xdp.CreateOutbound(unixsocket.GetReadChannel())
 	inbound := xdp.CreateInbound(unixsocket.GetWriteChannel(), outbound)
 
+	interfaces := make(map[string]struct{})
+
+	interfaces["veth0"] = struct{}{}
+	interfaces["veth1"] = struct{}{}
+	interfaces["vxlan0"] = struct{}{}
+	interfaces["br0"] = struct{}{}
+	interfaces["lo"] = struct{}{}
+
+	go func() {
+
+		for {
+
+			time.Sleep(time.Second * 5)
+			ifaces, err := net.Interfaces()
+
+			if err != nil {
+				panic(err)
+			}
+
+			newIfaces := make([]string, 0, len(ifaces))
+			for _, iface := range ifaces {
+				if _, ok := interfaces[iface.Name]; !ok {
+					newIfaces = append(newIfaces, iface.Name)
+					interfaces[iface.Name] = struct{}{}
+				}
+			}
+
+			for _, iface := range newIfaces {
+				fmt.Println("Found interface " + iface)
+				sock := xdp.CreateXdpBpfSock(0, iface)
+				inbound.AddSocket(iface, sock)
+				fmt.Println("Found interface " + iface)
+			}
+		}
+
+	}()
+
 	inbound.Start()
 	outbound.Start()
+
+	err := unixsocket.StartSocket()
+	if err != nil {
+		return
+	}
 }

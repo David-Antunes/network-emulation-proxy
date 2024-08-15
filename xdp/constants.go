@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/asavie/xdp"
+	"github.com/david-antunes/xdp"
 )
 
 const queueSize = 10000

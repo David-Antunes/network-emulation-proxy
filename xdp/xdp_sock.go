@@ -3,7 +3,7 @@ package xdp
 import (
 	"time"
 
-	"github.com/asavie/xdp"
+	"github.com/david-antunes/xdp"
 	"github.com/google/uuid"
 	"github.com/vishvananda/netlink"
 )
@@ -75,7 +75,7 @@ func (socket XdpSock) SendFrame(frame *Frame) {
 
 	if len(txDescs) > 0 {
 		outFrame := socket.sock.GetFrame(txDescs[0])
-		txDescs[0].Len = uint32(copy(outFrame, frame.framePointer))
+		txDescs[0].Len = uint32(copy(outFrame, frame.FramePointer))
 		socket.sock.Transmit(txDescs)
 	}
 }
@@ -90,7 +90,7 @@ func (socket XdpSock) Send(frames []*Frame) {
 
 	for i := 0; i < len(txDescs); i++ {
 		outFrame := socket.sock.GetFrame(txDescs[i])
-		txDescs[i].Len = uint32(copy(outFrame, frames[i].framePointer))
+		txDescs[i].Len = uint32(copy(outFrame, frames[i].FramePointer))
 	}
 	socket.sock.Transmit(txDescs)
 }
