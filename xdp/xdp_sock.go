@@ -55,7 +55,7 @@ func (socket XdpSock) Receive() []*Frame {
 			macOrig := string(framePointer[6:12])
 			buf := make([]byte, xdpFrameSize)
 			copy(buf, framePointer)
-			frame := &Frame{buf, int(rxDescs[i].Len), int64(time.Now().Nanosecond()), macOrig, macDest}
+			frame := &Frame{buf, int(rxDescs[i].Len), time.Now(), macOrig, macDest}
 			frames = append(frames, frame)
 		}
 		socket.sock.Fill(rxDescs)

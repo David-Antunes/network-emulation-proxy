@@ -1,14 +1,16 @@
 package xdp
 
+import "time"
+
 type Frame struct {
-	FramePointer   []byte `json:"framePointer"`
-	FrameSize      int    `json:"frameSize"`
-	Time           int64  `json:"time"`
-	MacOrigin      string `json:"macOrigin"`
-	MacDestination string `json:"macDestination"`
+	FramePointer   []byte    `json:"framePointer"`
+	FrameSize      int       `json:"frameSize"`
+	Time           time.Time `json:"time"`
+	MacOrigin      string    `json:"macOrigin"`
+	MacDestination string    `json:"macDestination"`
 }
 
-func CreateFrame(framePointer []byte, frameSize int, time int64, macOrigin, macDestination string) *Frame {
+func CreateFrame(framePointer []byte, frameSize int, time time.Time, macOrigin, macDestination string) *Frame {
 	return &Frame{
 		FramePointer:   framePointer,
 		FrameSize:      frameSize,
@@ -18,7 +20,7 @@ func CreateFrame(framePointer []byte, frameSize int, time int64, macOrigin, macD
 	}
 }
 
-func (frame *Frame) GetTime() int64 {
+func (frame *Frame) GetTime() time.Time {
 	return frame.Time
 }
 

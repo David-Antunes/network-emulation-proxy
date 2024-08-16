@@ -24,9 +24,9 @@ func cleanup(in *xdp.Inbound, out *xdp.Outbound) {
 }
 func main() {
 	err := os.Remove("/tmp/emu.sock")
-	if err != nil {
-		return
-	}
+	//if err != nil {
+	//	return
+	//}
 	unixsocket.SetSocketPath("/tmp/emu.sock")
 	outbound := xdp.CreateOutbound(unixsocket.GetReadChannel())
 	inbound := xdp.CreateInbound(unixsocket.GetWriteChannel(), outbound)

@@ -1,9 +1,8 @@
 package unixsocket
 
 import (
-	"encoding/json"
+	"encoding/gob"
 	"errors"
-	"fmt"
 	"gitea.homelab-antunes.duckdns.org/emu-socket/xdp"
 	"log"
 	"net"
@@ -60,35 +59,27 @@ func StartSocket() error {
 			log.Fatal(err)
 		}
 		go sendMsg(conn)
+		dec := gob.NewDecoder(conn)
 		for {
-			buf := make([]byte, 2868)
+			var frame *xdp.Frame
 
-			// Read data from the connection.
-			n, err := conn.Read(buf)
-			buf = buf[:n]
-			if err != nil {
-				break
-			}
-			frame := &xdp.Frame{}
-			err = json.Unmarshal(buf, frame)
+			err = dec.Decode(&frame)
 			if err != nil {
 				break
 			}
 			s.read <- frame
-			fmt.Println(net.HardwareAddr(frame.MacOrigin), net.HardwareAddr(frame.MacDestination), frame.Time)
+			//fmt.Println(net.HardwareAddr(frame.MacOrigin), net.HardwareAddr(frame.MacDestination), frame.Time)
 		}
 	}
 }
 
 func sendMsg(conn net.Conn) {
+	enc := gob.NewEncoder(conn)
 	for {
 		select {
 		case frame := <-s.write:
-			bytes, err := json.Marshal(frame)
-			if err != nil {
-				continue
-			}
-			_, err = conn.Write(bytes)
+
+			err := enc.Encode(frame)
 			if err != nil {
 				return
 			}
@@ -97,6 +88,12 @@ func sendMsg(conn net.Conn) {
 }
 
 func Close() {
-	s.conn.Close()
-	os.Remove(s.socketPath)
+	err := s.conn.Close()
+	if err != nil {
+		return
+	}
+	err = os.Remove(s.socketPath)
+	if err != nil {
+		return
+	}
 }
