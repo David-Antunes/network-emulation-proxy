@@ -2,14 +2,14 @@ package main
 
 import (
 	"fmt"
-	"gitea.homelab-antunes.duckdns.org/david-antunes/network-emulation-socket/xdp"
+	"github.com/David-Antunes/network-emulation-socket/xdp"
 	"net"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	unixsocket "gitea.homelab-antunes.duckdns.org/david-antunes/network-emulation-socket/unix-socket"
+	unixsocket "github.com/David-Antunes/network-emulation-socket/unix-socket"
 )
 
 func cleanup(in *xdp.Inbound, out *xdp.Outbound) {
