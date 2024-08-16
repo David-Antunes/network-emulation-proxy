@@ -15,10 +15,11 @@ const gcSize = 10
 const batchSize = 256
 
 const broadcastMacAddress = "ff:ff:ff:ff:ff:ff"
+const xdpFrameSize = 2048
 
 var DefaultSocketOptions = xdp.SocketOptions{
 	NumFrames:              8192,
-	FrameSize:              4096,
+	FrameSize:              xdpFrameSize,
 	FillRingNumDescs:       4096,
 	CompletionRingNumDescs: 4096,
 	RxRingNumDescs:         4096,

@@ -34,7 +34,7 @@ func (sock *VirtSock) Start() {
 				sock.Unlock()
 				for _, endpoint := range auxEndpoints {
 					time.Sleep(time.Second)
-					frame := &Frame{nil, time.Now(), sock.mac, endpoint}
+					frame := &Frame{nil, 0, int64(time.Now().Nanosecond()), sock.mac, endpoint}
 					sock.queue <- frame
 				}
 			}
@@ -43,7 +43,7 @@ func (sock *VirtSock) Start() {
 }
 
 func (sock *VirtSock) InjectFrame(destMac string) {
-	sock.queue <- &Frame{nil, time.Now(), sock.mac, destMac}
+	sock.queue <- &Frame{nil, 0, int64(time.Now().Nanosecond()), sock.mac, destMac}
 }
 
 func (sock *VirtSock) ID() string {

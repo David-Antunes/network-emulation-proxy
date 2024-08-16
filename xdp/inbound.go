@@ -36,7 +36,7 @@ func CreateInbound(gateway chan *Frame, outbound *Outbound) *Inbound {
 		Mutex:    sync.Mutex{},
 		sockets:  make(map[string]Isocket),
 		outbound: outbound,
-		queue:    make(chan *Frame),
+		queue:    make(chan *Frame, queueSize),
 		running:  false,
 		gateway:  gateway,
 		ctx:      make(chan struct{}),
@@ -114,7 +114,7 @@ func (inbound *Inbound) Stop() {
 	inbound.ctx <- struct{}{}
 }
 
-func (inbound *Inbound) CloseSockets() {
+func (inbound *Inbound) Close() {
 	inbound.Lock()
 	inbound.running = false
 	inbound.Stop()

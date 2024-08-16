@@ -1,12 +1,13 @@
 package unixsocket
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"gitea.homelab-antunes.duckdns.org/emu-socket/xdp"
 	"log"
 	"net"
 	"os"
-	"time"
 )
 
 type socket struct {
@@ -21,8 +22,8 @@ type socket struct {
 var s = &socket{
 	socketPath: "",
 	sock:       nil,
-	read:       make(chan *xdp.Frame),
-	write:      make(chan *xdp.Frame),
+	read:       make(chan *xdp.Frame, 1000),
+	write:      make(chan *xdp.Frame, 1000),
 	conn:       nil,
 	closed:     false,
 }
@@ -37,6 +38,11 @@ func GetWriteChannel() chan *xdp.Frame {
 func SetSocketPath(path string) {
 
 	s.socketPath = path
+	listen, err := net.Listen("unix", path)
+	s.sock = listen
+	if err != nil {
+		panic(err)
+	}
 }
 
 func StartSocket() error {
@@ -55,7 +61,7 @@ func StartSocket() error {
 		}
 		go sendMsg(conn)
 		for {
-			buf := make([]byte, 2048)
+			buf := make([]byte, 2868)
 
 			// Read data from the connection.
 			n, err := conn.Read(buf)
@@ -63,8 +69,13 @@ func StartSocket() error {
 			if err != nil {
 				break
 			}
-
-			s.read <- xdp.CreateFrame(buf, time.Now(), "", "")
+			frame := &xdp.Frame{}
+			err = json.Unmarshal(buf, frame)
+			if err != nil {
+				break
+			}
+			s.read <- frame
+			fmt.Println(net.HardwareAddr(frame.MacOrigin), net.HardwareAddr(frame.MacDestination), frame.Time)
 		}
 	}
 }
@@ -73,7 +84,11 @@ func sendMsg(conn net.Conn) {
 	for {
 		select {
 		case frame := <-s.write:
-			_, err := conn.Write(frame.Frame())
+			bytes, err := json.Marshal(frame)
+			if err != nil {
+				continue
+			}
+			_, err = conn.Write(bytes)
 			if err != nil {
 				return
 			}

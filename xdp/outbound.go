@@ -1,7 +1,9 @@
 package xdp
 
 import (
+	"fmt"
 	"log"
+	"net"
 	"os"
 	"sync"
 )
@@ -23,14 +25,14 @@ func CreateOutbound(gateway chan *Frame) *Outbound {
 		sockets: map[string]Isocket{},
 		gateway: gateway,
 		running: false,
-		queue:   make(chan *Frame),
+		queue:   make(chan *Frame, queueSize),
 		ctx:     make(chan struct{}),
 	}
 }
 
 func (outbound *Outbound) AddMac(mac string, socket Isocket) {
 	outbound.Lock()
-	if _, ok := outbound.sockets[mac]; ok {
+	if _, ok := outbound.sockets[mac]; !ok {
 		outbound.sockets[mac] = socket
 	}
 	outbound.Unlock()
@@ -56,6 +58,7 @@ func (outbound *Outbound) receive() {
 		case <-outbound.ctx:
 			return
 		case frame := <-outbound.gateway:
+			fmt.Println("yooo")
 			outbound.queue <- frame
 		}
 	}
@@ -69,7 +72,11 @@ func (outbound *Outbound) send() {
 			return
 
 		case frame := <-outbound.queue:
+			fmt.Println(len(outbound.sockets))
+			fmt.Println("before", net.HardwareAddr(frame.MacOrigin), net.HardwareAddr(frame.MacDestination), frame.Time)
 			if socket, ok := outbound.sockets[frame.MacDestination]; ok {
+
+				fmt.Println("outbound", net.HardwareAddr(frame.MacOrigin), net.HardwareAddr(frame.MacDestination), frame.Time)
 				socket.SendFrame(frame)
 			}
 
@@ -79,5 +86,6 @@ func (outbound *Outbound) send() {
 
 func (outbound *Outbound) Close() {
 	outbound.running = false
+	outbound.ctx <- struct{}{}
 	outbound.ctx <- struct{}{}
 }

@@ -53,9 +53,9 @@ func (socket XdpSock) Receive() []*Frame {
 			framePointer := socket.sock.GetFrame(rxDescs[i])
 			macDest := string(framePointer[0:6])
 			macOrig := string(framePointer[6:12])
-			buf := make([]byte, rxDescs[i].Len)
-			copy(buf, framePointer[:rxDescs[i].Len])
-			frame := &Frame{buf, time.Now(), macOrig, macDest}
+			buf := make([]byte, xdpFrameSize)
+			copy(buf, framePointer)
+			frame := &Frame{buf, int(rxDescs[i].Len), int64(time.Now().Nanosecond()), macOrig, macDest}
 			frames = append(frames, frame)
 		}
 		socket.sock.Fill(rxDescs)
@@ -75,7 +75,7 @@ func (socket XdpSock) SendFrame(frame *Frame) {
 
 	if len(txDescs) > 0 {
 		outFrame := socket.sock.GetFrame(txDescs[0])
-		txDescs[0].Len = uint32(copy(outFrame, frame.FramePointer))
+		txDescs[0].Len = uint32(copy(outFrame, frame.FramePointer[:frame.FrameSize]))
 		socket.sock.Transmit(txDescs)
 	}
 }
