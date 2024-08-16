@@ -3,7 +3,8 @@ package unixsocket
 import (
 	"encoding/gob"
 	"errors"
-	"gitea.homelab-antunes.duckdns.org/emu-socket/xdp"
+	"gitea.homelab-antunes.duckdns.org/david-antunes/network-emulation-socket/xdp"
+
 	"log"
 	"net"
 	"os"

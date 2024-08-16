@@ -2,14 +2,14 @@ package main
 
 import (
 	"fmt"
-	"gitea.homelab-antunes.duckdns.org/emu-socket/xdp"
+	"gitea.homelab-antunes.duckdns.org/david-antunes/network-emulation-socket/xdp"
 	"net"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	unixsocket "gitea.homelab-antunes.duckdns.org/emu-socket/unix-socket"
+	unixsocket "gitea.homelab-antunes.duckdns.org/david-antunes/network-emulation-socket/unix-socket"
 )
 
 func cleanup(in *xdp.Inbound, out *xdp.Outbound) {
@@ -39,6 +39,7 @@ func main() {
 	interfaces["vxlan0"] = struct{}{}
 	interfaces["br0"] = struct{}{}
 	interfaces["lo"] = struct{}{}
+
 	go func() {
 
 		for {

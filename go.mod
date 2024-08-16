@@ -1,4 +1,4 @@
-module gitea.homelab-antunes.duckdns.org/emu-socket
+module gitea.homelab-antunes.duckdns.org/david-antunes/network-emulation-socket
 
 go 1.23
 
