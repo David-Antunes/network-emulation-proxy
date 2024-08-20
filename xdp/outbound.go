@@ -31,10 +31,8 @@ func CreateOutbound(gateway chan *Frame) *Outbound {
 
 func (outbound *Outbound) AddMac(mac string, socket Isocket) {
 	outbound.Lock()
-	if _, ok := outbound.sockets[mac]; !ok {
-		outbound.sockets[mac] = socket
-		outLog.Println("Added MAC address:", net.HardwareAddr(mac))
-	}
+  outbound.sockets[mac] = socket
+  outLog.Println("Added MAC address:", net.HardwareAddr(mac))
 	outbound.Unlock()
 }
 
