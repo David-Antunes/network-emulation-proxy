@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/David-Antunes/network-emulation-socket/xdp"
 	"net"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/David-Antunes/network-emulation-socket/xdp"
 
 	unixsocket "github.com/David-Antunes/network-emulation-socket/unix-socket"
 )
@@ -29,7 +30,8 @@ func main() {
 	//}
 	unixsocket.SetSocketPath("/tmp/emu.sock")
 	outbound := xdp.CreateOutbound(unixsocket.GetReadChannel())
-	inbound := xdp.CreateInbound(unixsocket.GetWriteChannel(), outbound)
+	outbound.SetSocket()
+	inbound := xdp.CreateInbound(unixsocket.GetWriteChannel())
 
 	go cleanup(inbound, outbound)
 	interfaces := make(map[string]struct{})
@@ -76,4 +78,7 @@ func main() {
 	if err != nil {
 		return
 	}
+}
+func htons(i uint16) uint16 {
+	return (i<<8)&0xff00 | i>>8
 }

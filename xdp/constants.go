@@ -10,11 +10,6 @@ import (
 
 const queueSize = 10000
 
-const gcSize = 10
-
-const batchSize = 256
-
-const broadcastMacAddress = "ff:ff:ff:ff:ff:ff"
 const xdpFrameSize = 2048
 
 var DefaultSocketOptions = xdp.SocketOptions{

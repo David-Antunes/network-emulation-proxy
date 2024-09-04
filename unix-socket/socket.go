@@ -3,6 +3,7 @@ package unixsocket
 import (
 	"encoding/gob"
 	"errors"
+
 	"github.com/David-Antunes/network-emulation-socket/xdp"
 
 	"log"
@@ -79,7 +80,7 @@ func sendMsg(conn net.Conn) {
 	for {
 		select {
 		case frame := <-s.write:
-
+			frame.FramePointer = frame.FramePointer[:frame.FrameSize]
 			err := enc.Encode(frame)
 			if err != nil {
 				return

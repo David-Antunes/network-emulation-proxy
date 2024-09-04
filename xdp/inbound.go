@@ -21,25 +21,23 @@ routine.
 */
 type Inbound struct {
 	sync.Mutex
-	sockets  map[string]Isocket
-	outbound *Outbound
-	queue    chan *Frame
-	running  bool
-	gateway  chan *Frame
-	ctx      chan struct{}
+	sockets map[string]Isocket
+	queue   chan *Frame
+	running bool
+	gateway chan *Frame
+	ctx     chan struct{}
 }
 
 var inLog = log.New(os.Stdout, "inbound INFO: ", log.Ltime)
 
-func CreateInbound(gateway chan *Frame, outbound *Outbound) *Inbound {
+func CreateInbound(gateway chan *Frame) *Inbound {
 	return &Inbound{
-		Mutex:    sync.Mutex{},
-		sockets:  make(map[string]Isocket),
-		outbound: outbound,
-		queue:    make(chan *Frame, queueSize),
-		running:  false,
-		gateway:  gateway,
-		ctx:      make(chan struct{}),
+		Mutex:   sync.Mutex{},
+		sockets: make(map[string]Isocket),
+		queue:   make(chan *Frame, queueSize),
+		running: false,
+		gateway: gateway,
+		ctx:     make(chan struct{}),
 	}
 }
 
@@ -63,7 +61,6 @@ func (inbound *Inbound) RemoveSocket(iface string) {
 }
 
 func (inbound *Inbound) pollSocket(socket Isocket) {
-	//TODO: Pass this to somewhere else
 
 	var frames []*Frame
 
@@ -72,9 +69,6 @@ func (inbound *Inbound) pollSocket(socket Isocket) {
 	}
 
 	inLog.Println("Found MAC address: ", net.HardwareAddr(frames[0].MacOrigin))
-
-	mac := frames[0].MacOrigin
-	inbound.outbound.AddMac(mac, socket)
 
 	for _, frame := range frames {
 		inbound.queue <- frame

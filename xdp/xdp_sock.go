@@ -36,7 +36,7 @@ func CreateXdpSock(queue int, ifname string) XdpSock {
 }
 
 func (socket XdpSock) Receive() []*Frame {
-	numRx, _, err := socket.sock.Poll(1)
+	numRx, _, err := socket.sock.Poll(-1)
 
 	if err != nil {
 		panic(err)
@@ -53,7 +53,7 @@ func (socket XdpSock) Receive() []*Frame {
 			framePointer := socket.sock.GetFrame(rxDescs[i])
 			macDest := string(framePointer[0:6])
 			macOrig := string(framePointer[6:12])
-			buf := make([]byte, xdpFrameSize)
+			buf := make([]byte, int(rxDescs[i].Len))
 			copy(buf, framePointer)
 			frame := &Frame{buf, int(rxDescs[i].Len), time.Now(), macOrig, macDest}
 			frames = append(frames, frame)

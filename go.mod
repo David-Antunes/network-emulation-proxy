@@ -4,6 +4,7 @@ go 1.23
 
 require (
 	github.com/david-antunes/xdp v0.0.0-20240815112357-0c2bac89fe0a
+	github.com/google/gopacket v1.1.19
 	github.com/google/uuid v1.6.0
 	github.com/vishvananda/netlink v1.1.0
 )
