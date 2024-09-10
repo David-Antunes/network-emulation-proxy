@@ -10,7 +10,7 @@ type Frame struct {
 	MacDestination string    `json:"macDestination"`
 }
 
-func CreateFrame(framePointer []byte, frameSize int, time time.Time, macOrigin, macDestination string) *Frame {
+func NewFrame(framePointer []byte, frameSize int, time time.Time, macOrigin, macDestination string) *Frame {
 	return &Frame{
 		FramePointer:   framePointer,
 		FrameSize:      frameSize,
@@ -26,6 +26,10 @@ func (frame *Frame) GetTime() time.Time {
 
 func (frame *Frame) Frame() []byte {
 	return frame.FramePointer
+}
+
+func (frame *Frame) GetFrameSize() int {
+	return frame.FrameSize
 }
 
 func (frame *Frame) GetMacOrigin() string {

@@ -2,18 +2,20 @@ package main
 
 import (
 	"fmt"
+	"github.com/David-Antunes/network-emulation-proxy/internal/daemon"
+	"github.com/David-Antunes/network-emulation-proxy/internal/inbound"
+	"github.com/David-Antunes/network-emulation-proxy/internal/outbound"
+	"github.com/David-Antunes/network-emulation-proxy/internal/unix-socket"
 	"net"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/David-Antunes/network-emulation-socket/xdp"
-
-	unixsocket "github.com/David-Antunes/network-emulation-socket/unix-socket"
+	"github.com/David-Antunes/network-emulation-proxy/xdp"
 )
 
-func cleanup(in *xdp.Inbound, out *xdp.Outbound) {
+func cleanup(in *inbound.Inbound, out *outbound.Outbound) {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
@@ -29,18 +31,15 @@ func main() {
 	//	return
 	//}
 	unixsocket.SetSocketPath("/tmp/emu.sock")
-	outbound := xdp.CreateOutbound(unixsocket.GetReadChannel())
+	outbound := outbound.CreateOutbound(unixsocket.GetReadChannel())
 	outbound.SetSocket()
-	inbound := xdp.CreateInbound(unixsocket.GetWriteChannel())
+	inbound := inbound.CreateInbound(unixsocket.GetWriteChannel())
+
+	server := daemon.NewDaemon(inbound, outbound, "/tmp/proxy-server.sock")
+
+	server.Serve()
 
 	go cleanup(inbound, outbound)
-	interfaces := make(map[string]struct{})
-
-	interfaces["veth0"] = struct{}{}
-	interfaces["veth1"] = struct{}{}
-	interfaces["vxlan0"] = struct{}{}
-	interfaces["br0"] = struct{}{}
-	interfaces["lo"] = struct{}{}
 
 	go func() {
 
@@ -78,7 +77,4 @@ func main() {
 	if err != nil {
 		return
 	}
-}
-func htons(i uint16) uint16 {
-	return (i<<8)&0xff00 | i>>8
 }

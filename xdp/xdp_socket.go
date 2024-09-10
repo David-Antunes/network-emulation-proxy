@@ -1,6 +1,7 @@
 package xdp
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/david-antunes/xdp"
@@ -19,31 +20,31 @@ func (socket XdpSock) ID() string {
 	return socket.id.String()
 }
 
-func CreateXdpSock(queue int, ifname string) XdpSock {
+func CreateXdpSock(queue int, ifname string) (*XdpSock, error) {
 
 	link, err := netlink.LinkByName(ifname)
 
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	xsk, err := xdp.NewSocket(link.Attrs().Index, queue, &DefaultSocketOptions)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	xsk.Fill(xsk.GetDescs(xsk.NumFreeFillSlots(), true))
-	return XdpSock{uuid.New(), *xsk, link, []xdp.Desc{}}
+	return &XdpSock{uuid.New(), *xsk, link, []xdp.Desc{}}, nil
 }
 
-func (socket XdpSock) Receive() []*Frame {
+func (socket XdpSock) Receive() ([]*Frame, error) {
 	numRx, _, err := socket.sock.Poll(-1)
 
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	if numRx == 0 {
-		return []*Frame{}
+		return []*Frame{}, nil
 	}
 
 	rxDescs := socket.sock.Receive(numRx)
@@ -59,9 +60,9 @@ func (socket XdpSock) Receive() []*Frame {
 			frames = append(frames, frame)
 		}
 		socket.sock.Fill(rxDescs)
-		return frames
+		return frames, nil
 	}
-	return []*Frame{}
+	return []*Frame{}, nil
 }
 
 func (socket XdpSock) SendFrame(frame *Frame) {
@@ -69,7 +70,8 @@ func (socket XdpSock) SendFrame(frame *Frame) {
 	_, _, err := socket.sock.Poll(1)
 
 	if err != nil {
-		panic(err)
+		fmt.Println(err)
+		return
 	}
 	txDescs := socket.getTransmitDescs(1)
 
@@ -84,7 +86,8 @@ func (socket XdpSock) Send(frames []*Frame) {
 	_, _, err := socket.sock.Poll(1)
 
 	if err != nil {
-		panic(err)
+		fmt.Println(err)
+		return
 	}
 	txDescs := socket.getTransmitDescs(len(frames))
 
@@ -111,6 +114,6 @@ func (socket XdpSock) getTransmitDescs(number int) []xdp.Desc {
 func (socket XdpSock) Close() {
 	err := socket.sock.Close()
 	if err != nil {
-		panic(err)
+		fmt.Println(err)
 	}
 }

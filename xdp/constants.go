@@ -8,8 +8,6 @@ import (
 	"github.com/david-antunes/xdp"
 )
 
-const queueSize = 10000
-
 const xdpFrameSize = 2048
 
 var DefaultSocketOptions = xdp.SocketOptions{

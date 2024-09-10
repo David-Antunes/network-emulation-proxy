@@ -1,7 +1,9 @@
-package xdp
+package inbound
 
 import (
 	"fmt"
+	"github.com/David-Antunes/network-emulation-proxy/internal"
+	"github.com/David-Antunes/network-emulation-proxy/xdp"
 	"log"
 	"net"
 	"os"
@@ -21,27 +23,27 @@ routine.
 */
 type Inbound struct {
 	sync.Mutex
-	sockets map[string]Isocket
-	queue   chan *Frame
+	sockets map[string]xdp.Isocket
+	queue   chan *xdp.Frame
 	running bool
-	gateway chan *Frame
+	gateway chan *xdp.Frame
 	ctx     chan struct{}
 }
 
 var inLog = log.New(os.Stdout, "inbound INFO: ", log.Ltime)
 
-func CreateInbound(gateway chan *Frame) *Inbound {
+func CreateInbound(gateway chan *xdp.Frame) *Inbound {
 	return &Inbound{
 		Mutex:   sync.Mutex{},
-		sockets: make(map[string]Isocket),
-		queue:   make(chan *Frame, queueSize),
+		sockets: make(map[string]xdp.Isocket),
+		queue:   make(chan *xdp.Frame, internal.QUEUE_SIZE),
 		running: false,
 		gateway: gateway,
 		ctx:     make(chan struct{}),
 	}
 }
 
-func (inbound *Inbound) AddSocket(iface string, socket Isocket) {
+func (inbound *Inbound) AddSocket(iface string, socket xdp.Isocket) {
 	inbound.Lock()
 	if _, ok := inbound.sockets[iface]; !ok {
 		inbound.sockets[iface] = socket
@@ -60,12 +62,16 @@ func (inbound *Inbound) RemoveSocket(iface string) {
 	inbound.Unlock()
 }
 
-func (inbound *Inbound) pollSocket(socket Isocket) {
+func (inbound *Inbound) pollSocket(socket xdp.Isocket) {
 
-	var frames []*Frame
-
+	var frames []*xdp.Frame
+	var err error
 	for len(frames) == 0 {
-		frames = socket.Receive()
+		frames, err = socket.Receive()
+	}
+	if err != nil {
+		fmt.Println(err)
+		return
 	}
 
 	inLog.Println("Found MAC address: ", net.HardwareAddr(frames[0].MacOrigin))
@@ -75,8 +81,14 @@ func (inbound *Inbound) pollSocket(socket Isocket) {
 	}
 
 	for {
-		for _, frame := range socket.Receive() {
-			if len(inbound.queue) < queueSize {
+
+		frames, err = socket.Receive()
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		for _, frame := range frames {
+			if len(inbound.queue) < internal.QUEUE_SIZE {
 				inbound.queue <- frame
 			} else {
 				fmt.Println("Queue Full!")
@@ -97,7 +109,6 @@ func (inbound *Inbound) send() {
 		select {
 		case <-inbound.ctx:
 			return
-
 		case frame := <-inbound.queue:
 			inbound.gateway <- frame
 		}

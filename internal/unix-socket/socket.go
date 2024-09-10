@@ -4,7 +4,7 @@ import (
 	"encoding/gob"
 	"errors"
 
-	"github.com/David-Antunes/network-emulation-socket/xdp"
+	"github.com/David-Antunes/network-emulation-proxy/xdp"
 
 	"log"
 	"net"
