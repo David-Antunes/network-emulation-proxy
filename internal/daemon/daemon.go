@@ -6,9 +6,10 @@ import (
 	"github.com/David-Antunes/network-emulation-proxy/internal/outbound"
 	"github.com/David-Antunes/network-emulation-proxy/xdp"
 	"net"
+	"net/http"
+	"os"
 	"sync"
 	"syscall"
-	"time"
 )
 
 type Daemon struct {
@@ -16,10 +17,20 @@ type Daemon struct {
 	in         *inbound.Inbound
 	out        *outbound.Outbound
 	unixPath   string
+	httpServer *http.Server
+	socket     net.Listener
 	interfaces map[string]struct{}
 }
 
 func NewDaemon(in *inbound.Inbound, out *outbound.Outbound, unixPath string) *Daemon {
+
+	s, err := net.Listen("unix", unixPath)
+	if err != nil {
+		fmt.Println(err)
+		syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+		return nil
+	}
+
 	interfaces := make(map[string]struct{})
 
 	// Ignore Interfaces
@@ -29,52 +40,77 @@ func NewDaemon(in *inbound.Inbound, out *outbound.Outbound, unixPath string) *Da
 	interfaces["br0"] = struct{}{}
 	interfaces["lo"] = struct{}{}
 
-	return &Daemon{
+	d := &Daemon{
 		Mutex:      sync.Mutex{},
 		in:         in,
 		out:        out,
 		unixPath:   unixPath,
+		httpServer: nil,
+		socket:     nil,
 		interfaces: interfaces,
 	}
+
+	m := http.NewServeMux()
+	m.HandleFunc("/refresh", d.SearchInterfaces)
+
+	httpServer := http.Server{
+		Handler: m,
+	}
+
+	d.httpServer = &httpServer
+	d.socket = s
+	return d
+
 }
-func (d *Daemon) Serve() error {
-	return nil
+func (d *Daemon) Serve() {
+	fmt.Println("Serving...")
+	if err := d.httpServer.Serve(d.socket); err != nil {
+		fmt.Println(err)
+		syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+	}
 }
-func (d *Daemon) SearchInterfaces() {
-	for {
-		time.Sleep(time.Second * 10)
-		ifaces, err := net.Interfaces()
 
-		if err != nil {
-			fmt.Println(err)
-			syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
-			continue
+func (d *Daemon) SearchInterfaces(w http.ResponseWriter, r *http.Request) {
+	d.Lock()
+	ifaces, err := net.Interfaces()
 
-		}
+	if err != nil {
+		fmt.Println(err)
+		syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+		return
+	}
 
-		if len(ifaces) == 1 {
-			fmt.Println("something went wrong with the network")
-			syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
-			continue
-		}
+	if len(ifaces) == 1 {
+		fmt.Println("something went wrong with the network")
+		syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+		return
+	}
 
-		newIfaces := make([]string, 0, len(ifaces))
-		for _, iface := range ifaces {
-			if _, ok := d.interfaces[iface.Name]; !ok {
-				newIfaces = append(newIfaces, iface.Name)
-				d.interfaces[iface.Name] = struct{}{}
-			}
-		}
-
-		for _, iface := range newIfaces {
-			fmt.Println("Found interface " + iface)
-			sock, err := xdp.CreateXdpBpfSock(0, iface)
-			if err != nil {
-				fmt.Println("Error creating socket: " + err.Error())
-				continue
-			}
-			d.in.AddSocket(iface, sock)
-			fmt.Println("Found interface " + iface)
+	newIfaces := make([]string, 0, len(ifaces))
+	for _, iface := range ifaces {
+		if _, ok := d.interfaces[iface.Name]; !ok {
+			newIfaces = append(newIfaces, iface.Name)
+			d.interfaces[iface.Name] = struct{}{}
 		}
 	}
+
+	for _, iface := range newIfaces {
+		fmt.Println("Found interface " + iface)
+		sock, err := xdp.CreateXdpBpfSock(0, iface)
+		if err != nil {
+			fmt.Println("Error creating socket: " + err.Error())
+			continue
+		}
+		d.in.AddSocket(iface, sock)
+		fmt.Println("Found interface " + iface)
+	}
+	d.Unlock()
+}
+
+func (d *Daemon) Cleanup() {
+	d.in.Close()
+	d.socket.Close()
+	d.httpServer.Close()
+	os.Remove(d.unixPath)
+	d.out.Close()
 }
