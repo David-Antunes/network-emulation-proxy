@@ -61,10 +61,16 @@ func (outbound *Outbound) Stop() {
 		outbound.ctx <- struct{}{}
 		outbound.ctx <- struct{}{}
 		outbound.running = false
-		err := syscall.Close(outbound.fd)
-		if err != nil {
-			fmt.Println(err)
-		}
+	}
+}
+
+func (outbound *Outbound) Close() {
+	outbound.ctx <- struct{}{}
+	outbound.ctx <- struct{}{}
+	outbound.running = false
+	err := syscall.Close(outbound.fd)
+	if err != nil {
+		fmt.Println(err)
 	}
 }
 
@@ -140,10 +146,4 @@ func (outbound *Outbound) send() {
 
 		}
 	}
-}
-
-func (outbound *Outbound) Close() {
-	outbound.running = false
-	outbound.ctx <- struct{}{}
-	outbound.ctx <- struct{}{}
 }
