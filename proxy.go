@@ -39,6 +39,8 @@ func main() {
 		viper.Set("PROXY_SOCKET", "/tmp/proxy.sock")
 		viper.Set("PROXY_SERVER", "/tmp/proxy-server.sock")
 		viper.Set("PROXY_RTT_SOCKET", "/tmp/proxy-rtt.sock")
+		viper.Set("TIMEOUT", time.Second*60)
+		viper.Set("NUM_TESTS", 5)
 		viper.SetConfigType("env")
 		viper.WriteConfigAs(".env")
 	} else {
@@ -46,11 +48,19 @@ func main() {
 			viper.Set("PROXY_SOCKET", "/tmp/proxy.sock")
 		}
 		if !viper.IsSet("PROXY_SERVER") {
-			viper.Set("PROXY_SOCKET", "/tmp/proxy-server.sock")
+			viper.Set("PROXY_SERVER", "/tmp/proxy-server.sock")
 		}
 		if !viper.IsSet("PROXY_RTT_SOCKET") {
-			viper.Set("PROXY_SOCKET", "/tmp/proxy-rtt.sock")
+			viper.Set("PROXY_RTT_SOCKET", "/tmp/proxy-rtt.sock")
 		}
+		if !viper.IsSet("TIMEOUT") {
+			viper.Set("TIMEOUT", time.Second*60)
+		}
+		if !viper.IsSet("NUM_TESTS") {
+			viper.Set("NUM_TESTS", 5)
+		}
+		viper.SetConfigType("env")
+		viper.WriteConfigAs(".env")
 	}
 
 	for id, value := range viper.AllSettings() {
@@ -81,7 +91,7 @@ func main() {
 		IP:   broadcastIP,
 		Port: 8000,
 	}
-	metrics := metricsManager.NewMetricsManager(rtt, metricsMac, metricsIp, 8000, rttConn, viper.GetString("PROXY_RTT_SOCKET"))
+	metrics := metricsManager.NewMetricsManager(rtt, metricsMac, metricsIp, 8000, rttConn, viper.GetString("PROXY_RTT_SOCKET"), time.Duration(viper.GetInt("TIMEOUT"))*time.Millisecond, viper.GetInt("NUM_TESTS"))
 	go metrics.Start()
 	go server.Serve()
 

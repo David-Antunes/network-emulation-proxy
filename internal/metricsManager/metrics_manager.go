@@ -32,9 +32,11 @@ type MetricsManager struct {
 	tests           []api.RTTRequest
 	currConnection  *conn.RttConnection
 	metricsSocket   *MetricsSocket
+	timeout         time.Duration
+	numTests        int
 }
 
-func NewMetricsManager(iface xdp.Isocket, mac net.HardwareAddr, ip net.IP, port int, endpoint *conn.RttConnection, socketPath string) *MetricsManager {
+func NewMetricsManager(iface xdp.Isocket, mac net.HardwareAddr, ip net.IP, port int, endpoint *conn.RttConnection, socketPath string, timeout time.Duration, numTests int) *MetricsManager {
 
 	fd, err := syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, int(htons(syscall.ETH_P_IP)))
 	if err != nil {
@@ -69,6 +71,8 @@ func NewMetricsManager(iface xdp.Isocket, mac net.HardwareAddr, ip net.IP, port 
 		tests:           make([]api.RTTRequest, 5),
 		currConnection:  endpoint,
 		metricsSocket:   metricsSocket,
+		timeout:         timeout,
+		numTests:        numTests,
 	}
 }
 
@@ -91,8 +95,7 @@ func (manager *MetricsManager) Start() {
 	var err error
 
 	for {
-		time.Sleep(time.Second * 5)
-		manager.tests = make([]api.RTTRequest, 0, 5)
+		manager.tests = make([]api.RTTRequest, 0, manager.numTests)
 
 		for i := 0; i < 5; i++ {
 			_, err = manager.sendTest()
@@ -123,10 +126,11 @@ func (manager *MetricsManager) Start() {
 			//fmt.Println("EndTime:", req.EndTime)
 			manager.tests = append(manager.tests, *req)
 		}
-		if len(manager.tests) == 5 {
+		if len(manager.tests) == manager.numTests {
 			manager.calculateAvg()
 		}
 
+		time.Sleep(manager.timeout)
 	}
 
 }
@@ -140,8 +144,8 @@ func (manager *MetricsManager) calculateAvg() {
 		accTransmit += test.EndTime.Sub(test.TransmitTime)
 	}
 
-	manager.receiveLatency = accReceive / 5
-	manager.transmitLatency = accTransmit / 5
+	manager.receiveLatency = accReceive / time.Duration(manager.numTests)
+	manager.transmitLatency = accTransmit / time.Duration(manager.numTests)
 	fmt.Println("receiveLtency:", manager.receiveLatency)
 	fmt.Println("transmitLatency:", manager.transmitLatency)
 }
