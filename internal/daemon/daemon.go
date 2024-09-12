@@ -2,17 +2,18 @@ package daemon
 
 import (
 	"errors"
-	"fmt"
 	"github.com/David-Antunes/network-emulation-proxy/internal"
 	"github.com/David-Antunes/network-emulation-proxy/internal/inbound"
 	"github.com/David-Antunes/network-emulation-proxy/internal/outbound"
 	"github.com/David-Antunes/network-emulation-proxy/xdp"
+	"log"
 	"net"
 	"net/http"
 	"os"
 	"sync"
-	"syscall"
 )
+
+var serverLog = log.New(os.Stdout, "SERVER INFO: ", log.Ltime)
 
 type Daemon struct {
 	sync.Mutex
@@ -64,10 +65,11 @@ func NewDaemon(in *inbound.Inbound, out *outbound.Outbound, unixPath string) *Da
 
 }
 func (d *Daemon) Serve() {
-	fmt.Println("Serving...")
+
+	serverLog.Println("socketPath:", d.unixPath)
+	serverLog.Println("Serving...")
 	if err := d.httpServer.Serve(d.socket); err != nil {
-		fmt.Println(err)
-		syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+		internal.ShutdownAndLog(err)
 	}
 }
 
@@ -94,14 +96,13 @@ func (d *Daemon) SearchInterfaces(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, iface := range newIfaces {
-		fmt.Println("Found interface " + iface)
+		serverLog.Println("Found interface:", iface)
 		sock, err := xdp.CreateXdpBpfSock(0, iface)
 		if err != nil {
-			fmt.Println("Error creating socket: " + err.Error())
+			serverLog.Println("Error creating socket: " + err.Error())
 			continue
 		}
 		d.in.AddSocket(iface, sock)
-		fmt.Println("Found interface " + iface)
 	}
 	d.Unlock()
 }
@@ -112,4 +113,5 @@ func (d *Daemon) Cleanup() {
 	d.httpServer.Close()
 	os.Remove(d.unixPath)
 	d.out.Close()
+	serverLog.Println("Closed")
 }
