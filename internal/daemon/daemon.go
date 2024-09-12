@@ -1,7 +1,9 @@
 package daemon
 
 import (
+	"errors"
 	"fmt"
+	"github.com/David-Antunes/network-emulation-proxy/internal"
 	"github.com/David-Antunes/network-emulation-proxy/internal/inbound"
 	"github.com/David-Antunes/network-emulation-proxy/internal/outbound"
 	"github.com/David-Antunes/network-emulation-proxy/xdp"
@@ -26,8 +28,7 @@ func NewDaemon(in *inbound.Inbound, out *outbound.Outbound, unixPath string) *Da
 
 	s, err := net.Listen("unix", unixPath)
 	if err != nil {
-		fmt.Println(err)
-		syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+		internal.ShutdownAndLog(err)
 		return nil
 	}
 
@@ -75,14 +76,12 @@ func (d *Daemon) SearchInterfaces(w http.ResponseWriter, r *http.Request) {
 	ifaces, err := net.Interfaces()
 
 	if err != nil {
-		fmt.Println(err)
-		syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+		internal.ShutdownAndLog(err)
 		return
 	}
 
 	if len(ifaces) == 1 {
-		fmt.Println("something went wrong with the network")
-		syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+		internal.ShutdownAndLog(errors.New("something went wrong with the network"))
 		return
 	}
 

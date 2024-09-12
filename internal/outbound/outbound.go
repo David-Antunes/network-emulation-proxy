@@ -116,15 +116,14 @@ func (outbound *Outbound) send() {
 				tcp = tcpLayer.(*layers.TCP)
 				err := tcp.SetNetworkLayerForChecksum(ip)
 				if err != nil {
-					fmt.Println(err)
-					syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+
+					internal.ShutdownAndLog(err)
 					continue
 				}
 			} else {
 
 				if err := syscall.Sendto(outbound.fd, frame.FramePointer, 0, outbound.addr); err != nil {
-					fmt.Println(err)
-					syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+					internal.ShutdownAndLog(err)
 					continue
 				}
 				continue
@@ -133,14 +132,12 @@ func (outbound *Outbound) send() {
 
 			buf := gopacket.NewSerializeBuffer()
 			if err := gopacket.SerializeLayers(buf, gopacket.SerializeOptions{ComputeChecksums: true, FixLengths: true}, eth, ip, tcp, gopacket.Payload(tcp.LayerPayload())); err != nil {
-				fmt.Println(err)
-				syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+				internal.ShutdownAndLog(err)
 				continue
 			}
 
 			if err := syscall.Sendto(outbound.fd, buf.Bytes(), 0, outbound.addr); err != nil {
-				fmt.Println(err)
-				syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+				internal.ShutdownAndLog(err)
 				continue
 			}
 
