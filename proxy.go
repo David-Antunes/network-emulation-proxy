@@ -9,6 +9,8 @@ import (
 	"github.com/David-Antunes/network-emulation-proxy/internal/outbound"
 	"github.com/David-Antunes/network-emulation-proxy/internal/unix-socket"
 	"github.com/David-Antunes/network-emulation-proxy/xdp"
+	"github.com/spf13/viper"
+	"log"
 	"net"
 	"os"
 	"os/signal"
@@ -16,6 +18,8 @@ import (
 	"syscall"
 	"time"
 )
+
+var proxyLog = log.New(os.Stdout, "PROXY INFO: ", log.Ltime)
 
 func cleanup(d *daemon.Daemon, m *metricsManager.MetricsManager) {
 	c := make(chan os.Signal, 1)
@@ -29,14 +33,41 @@ func cleanup(d *daemon.Daemon, m *metricsManager.MetricsManager) {
 	}()
 }
 func main() {
-	err := os.Remove("/tmp/emu.sock")
-	unixsocket.SetSocketPath("/tmp/emu.sock")
+
+	viper.SetConfigFile(".env")
+	if err := viper.ReadInConfig(); err != nil {
+		viper.Set("PROXY_SOCKET", "/tmp/proxy.sock")
+		viper.Set("PROXY_SERVER", "/tmp/proxy-server.sock")
+		viper.Set("PROXY_RTT_SOCKET", "/tmp/proxy-rtt.sock")
+		viper.SetConfigType("env")
+		viper.WriteConfigAs(".env")
+	} else {
+		if !viper.IsSet("PROXY_SOCKET") {
+			viper.Set("PROXY_SOCKET", "/tmp/proxy.sock")
+		}
+		if !viper.IsSet("PROXY_SERVER") {
+			viper.Set("PROXY_SOCKET", "/tmp/proxy-server.sock")
+		}
+		if !viper.IsSet("PROXY_RTT_SOCKET") {
+			viper.Set("PROXY_SOCKET", "/tmp/proxy-rtt.sock")
+		}
+	}
+
+	for id, value := range viper.AllSettings() {
+		proxyLog.Println(id, value)
+	}
+
+	os.Remove(viper.GetString("PROXY_SOCKET"))
+	os.Remove(viper.GetString("PROXY_SERVER"))
+	os.Remove(viper.GetString("PROXY_RTT_SOCKET"))
+
+	unixsocket.SetSocketPath(viper.GetString("PROXY_SOCKET"))
 
 	out := outbound.CreateOutbound(unixsocket.GetReadChannel())
 	out.SetSocket()
 	in := inbound.CreateInbound(unixsocket.GetWriteChannel())
 
-	server := daemon.NewDaemon(in, out, "/tmp/proxy-server.sock")
+	server := daemon.NewDaemon(in, out, viper.GetString("PROXY_SERVER"))
 
 	metricsIp, metricsMac, broadcastIP := GetIfaceInformation()
 	fmt.Println(metricsIp)
@@ -44,11 +75,13 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	metrics := metricsManager.NewMetricsManager(rtt, metricsMac, metricsIp, 8000, &conn.RttConnection{
+
+	rttConn := &conn.RttConnection{
 		Mac:  []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
 		IP:   broadcastIP,
 		Port: 8000,
-	})
+	}
+	metrics := metricsManager.NewMetricsManager(rtt, metricsMac, metricsIp, 8000, rttConn, viper.GetString("PROXY_RTT_SOCKET"))
 	go metrics.Start()
 	go server.Serve()
 

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/David-Antunes/network-emulation-proxy/api"
+	"github.com/David-Antunes/network-emulation-proxy/internal"
 	"github.com/David-Antunes/network-emulation-proxy/internal/conn"
 	"github.com/David-Antunes/network-emulation-proxy/xdp"
 	"github.com/google/gopacket"
@@ -30,27 +31,32 @@ type MetricsManager struct {
 	transmitLatency time.Duration
 	tests           []api.RTTRequest
 	currConnection  *conn.RttConnection
+	metricsSocket   *MetricsSocket
 }
 
-func NewMetricsManager(iface xdp.Isocket, mac net.HardwareAddr, ip net.IP, port int, endpoint *conn.RttConnection) *MetricsManager {
+func NewMetricsManager(iface xdp.Isocket, mac net.HardwareAddr, ip net.IP, port int, endpoint *conn.RttConnection, socketPath string) *MetricsManager {
 
 	fd, err := syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, int(htons(syscall.ETH_P_IP)))
 	if err != nil {
-		fmt.Println(err)
-		syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+		internal.ShutdownAndLog(err)
 		return nil
 	}
 
 	ifi, err := net.InterfaceByName("veth1")
 	if err != nil {
-		fmt.Println(err)
-		syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+		internal.ShutdownAndLog(err)
 		return nil
 	}
 	addr := &syscall.SockaddrLinklayer{
 		Protocol: htons(syscall.ETH_P_IP),
 		Ifindex:  ifi.Index,
 	}
+
+	metricsSocket, err := NewMetricsSocket(socketPath)
+	if err != nil {
+		internal.ShutdownAndLog(err)
+	}
+
 	return &MetricsManager{
 		iface:           iface,
 		mac:             mac,
@@ -62,6 +68,7 @@ func NewMetricsManager(iface xdp.Isocket, mac net.HardwareAddr, ip net.IP, port 
 		transmitLatency: 0,
 		tests:           make([]api.RTTRequest, 5),
 		currConnection:  endpoint,
+		metricsSocket:   metricsSocket,
 	}
 }
 
