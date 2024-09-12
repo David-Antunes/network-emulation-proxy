@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/David-Antunes/network-emulation-proxy/api"
+	"github.com/David-Antunes/network-emulation-proxy/internal/conn"
 	"github.com/David-Antunes/network-emulation-proxy/xdp"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -28,10 +29,10 @@ type MetricsManager struct {
 	receiveLatency  time.Duration
 	transmitLatency time.Duration
 	tests           []api.RTTRequest
-	currConnection  *api.StartTestRequest
+	currConnection  *conn.RttConnection
 }
 
-func NewMetricsManager(iface xdp.Isocket, mac net.HardwareAddr, ip net.IP, port int, endpoint *api.StartTestRequest) *MetricsManager {
+func NewMetricsManager(iface xdp.Isocket, mac net.HardwareAddr, ip net.IP, port int, endpoint *conn.RttConnection) *MetricsManager {
 
 	fd, err := syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, int(htons(syscall.ETH_P_IP)))
 	if err != nil {

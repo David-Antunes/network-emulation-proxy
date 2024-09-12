@@ -3,10 +3,10 @@ package unixsocket
 import (
 	"encoding/gob"
 	"errors"
+	"fmt"
 
 	"github.com/David-Antunes/network-emulation-proxy/xdp"
 
-	"log"
 	"net"
 	"os"
 )
@@ -58,7 +58,8 @@ func StartSocket() error {
 		conn, err := s.sock.Accept()
 		s.conn = conn
 		if err != nil {
-			log.Fatal(err)
+			fmt.Println(err)
+			return nil
 		}
 		go sendMsg(conn)
 		dec := gob.NewDecoder(conn)
@@ -67,6 +68,7 @@ func StartSocket() error {
 
 			err = dec.Decode(&frame)
 			if err != nil {
+				fmt.Println(err)
 				break
 			}
 			s.read <- frame
@@ -83,6 +85,7 @@ func sendMsg(conn net.Conn) {
 			frame.FramePointer = frame.FramePointer[:frame.FrameSize]
 			err := enc.Encode(frame)
 			if err != nil {
+				fmt.Println(err)
 				return
 			}
 		}
@@ -90,11 +93,13 @@ func sendMsg(conn net.Conn) {
 }
 
 func Close() {
-	err := s.conn.Close()
-	if err != nil {
-		return
+	if s.conn != nil {
+		err := s.conn.Close()
+		if err != nil {
+			return
+		}
 	}
-	err = os.Remove(s.socketPath)
+	err := os.Remove(s.socketPath)
 	if err != nil {
 		return
 	}

@@ -1,10 +1,10 @@
-package api
+package conn
 
 import (
 	"net"
 )
 
-type StartTestRequest struct {
+type RttConnection struct {
 	Mac  net.HardwareAddr `json:"mac"`
 	IP   net.IP           `json:"ip"`
 	Port int              `json:"port"`

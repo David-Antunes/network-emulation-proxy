@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/David-Antunes/network-emulation-proxy/api"
+	"github.com/David-Antunes/network-emulation-proxy/internal/conn"
 	"github.com/David-Antunes/network-emulation-proxy/internal/daemon"
 	"github.com/David-Antunes/network-emulation-proxy/internal/inbound"
 	"github.com/David-Antunes/network-emulation-proxy/internal/metricsManager"
@@ -30,8 +30,8 @@ func cleanup(d *daemon.Daemon, m *metricsManager.MetricsManager) {
 }
 func main() {
 	err := os.Remove("/tmp/emu.sock")
-
 	unixsocket.SetSocketPath("/tmp/emu.sock")
+
 	out := outbound.CreateOutbound(unixsocket.GetReadChannel())
 	out.SetSocket()
 	in := inbound.CreateInbound(unixsocket.GetWriteChannel())
@@ -44,8 +44,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
-	metrics := metricsManager.NewMetricsManager(rtt, metricsMac, metricsIp, 8000, &api.StartTestRequest{
+	metrics := metricsManager.NewMetricsManager(rtt, metricsMac, metricsIp, 8000, &conn.RttConnection{
 		Mac:  []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
 		IP:   broadcastIP,
 		Port: 8000,

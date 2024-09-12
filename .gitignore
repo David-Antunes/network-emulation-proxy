@@ -1,4 +1,5 @@
 asavie/
 .idea/
 .code/
-emu-socket
+proxy
+*.log
