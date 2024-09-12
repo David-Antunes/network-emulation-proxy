@@ -61,6 +61,8 @@ func (s *MetricsSocket) sendRTT(receiveLatency time.Duration, transmitLatency ti
 			fmt.Println(err)
 		}
 	}
+
+	metricsLog.Println("Published results")
 }
 
 func (s *MetricsSocket) Close() {

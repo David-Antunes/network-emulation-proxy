@@ -11,7 +11,9 @@ import (
 	"github.com/David-Antunes/network-emulation-proxy/xdp"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"log"
 	"net"
+	"os"
 	"runtime/debug"
 	"syscall"
 	"time"
@@ -30,11 +32,13 @@ type MetricsManager struct {
 	receiveLatency  time.Duration
 	transmitLatency time.Duration
 	tests           []api.RTTRequest
-	currConnection  *conn.RttConnection
+	endpoint        *conn.RttConnection
 	metricsSocket   *MetricsSocket
 	timeout         time.Duration
 	numTests        int
 }
+
+var metricsLog = log.New(os.Stdout, "METRICS INFO: ", log.Ltime)
 
 func NewMetricsManager(iface xdp.Isocket, mac net.HardwareAddr, ip net.IP, port int, endpoint *conn.RttConnection, socketPath string, timeout time.Duration, numTests int) *MetricsManager {
 
@@ -69,7 +73,7 @@ func NewMetricsManager(iface xdp.Isocket, mac net.HardwareAddr, ip net.IP, port 
 		receiveLatency:  0,
 		transmitLatency: 0,
 		tests:           make([]api.RTTRequest, 5),
-		currConnection:  endpoint,
+		endpoint:        endpoint,
 		metricsSocket:   metricsSocket,
 		timeout:         timeout,
 		numTests:        numTests,
@@ -87,13 +91,22 @@ func (manager *MetricsManager) Close() {
 	if err != nil {
 		fmt.Println(err)
 	}
+	metricsLog.Println("Closed")
 }
 
 func (manager *MetricsManager) Start() {
 
+	metricsLog.Println("MAC:", manager.mac)
+	metricsLog.Println("IP:", manager.ip)
+	metricsLog.Println("PORT:", manager.port)
+	metricsLog.Println("RTT:", manager.endpoint.IP, manager.endpoint.Port)
+	metricsLog.Println("Metrics Socket:", manager.metricsSocket.socketPath)
+	metricsLog.Println("Update Frequency:", manager.timeout)
+	metricsLog.Println("Number of Tests:", manager.numTests)
+
 	var frames []*xdp.Frame
 	var err error
-
+	time.Sleep(time.Second)
 	for {
 		manager.tests = make([]api.RTTRequest, 0, manager.numTests)
 
@@ -146,8 +159,9 @@ func (manager *MetricsManager) calculateAvg() {
 
 	manager.receiveLatency = accReceive / time.Duration(manager.numTests)
 	manager.transmitLatency = accTransmit / time.Duration(manager.numTests)
-	fmt.Println("receiveLtency:", manager.receiveLatency)
-	fmt.Println("transmitLatency:", manager.transmitLatency)
+
+	metricsLog.Println("receiveLatency:", manager.receiveLatency)
+	metricsLog.Println("transmitLatency:", manager.transmitLatency)
 }
 
 func (manager *MetricsManager) sendTest() (api.RTTRequest, error) {
@@ -166,7 +180,7 @@ func (manager *MetricsManager) sendTest() (api.RTTRequest, error) {
 
 	ethLayer := &layers.Ethernet{
 		SrcMAC:       manager.mac,
-		DstMAC:       manager.currConnection.Mac,
+		DstMAC:       manager.endpoint.Mac,
 		EthernetType: layers.EthernetTypeIPv4,
 	}
 	layersToSerialize = append(layersToSerialize, ethLayer)
@@ -175,13 +189,13 @@ func (manager *MetricsManager) sendTest() (api.RTTRequest, error) {
 		Version:  4,
 		TTL:      64,
 		SrcIP:    manager.ip,
-		DstIP:    manager.currConnection.IP,
+		DstIP:    manager.endpoint.IP,
 		Protocol: layers.IPProtocolUDP,
 	}
 	layersToSerialize = append(layersToSerialize, ipLayer)
 	udpLayer := &layers.UDP{
 		SrcPort: layers.UDPPort(manager.port),
-		DstPort: layers.UDPPort(manager.currConnection.Port),
+		DstPort: layers.UDPPort(manager.endpoint.Port),
 	}
 	udpLayer.SetNetworkLayerForChecksum(ipLayer)
 	layersToSerialize = append(layersToSerialize, udpLayer)

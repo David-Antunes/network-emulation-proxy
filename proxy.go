@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/David-Antunes/network-emulation-proxy/internal/conn"
 	"github.com/David-Antunes/network-emulation-proxy/internal/daemon"
 	"github.com/David-Antunes/network-emulation-proxy/internal/inbound"
@@ -54,7 +53,7 @@ func main() {
 			viper.Set("PROXY_RTT_SOCKET", "/tmp/proxy-rtt.sock")
 		}
 		if !viper.IsSet("TIMEOUT") {
-			viper.Set("TIMEOUT", time.Second*60)
+			viper.Set("TIMEOUT", 60000)
 		}
 		if !viper.IsSet("NUM_TESTS") {
 			viper.Set("NUM_TESTS", 5)
@@ -80,7 +79,7 @@ func main() {
 	server := daemon.NewDaemon(in, out, viper.GetString("PROXY_SERVER"))
 
 	metricsIp, metricsMac, broadcastIP := GetIfaceInformation()
-	fmt.Println(metricsIp)
+
 	rtt, err := xdp.CreateXdpBpfSock(0, "veth1")
 	if err != nil {
 		panic(err)
@@ -96,7 +95,6 @@ func main() {
 	go server.Serve()
 
 	go cleanup(server, metrics)
-
 	in.Start()
 	out.Start()
 	server.SearchInterfaces(nil, nil)
@@ -123,13 +121,11 @@ func GetIfaceInformation() (net.IP, net.HardwareAddr, net.IP) {
 	}
 	ip := strings.Split(addrs[0].String(), "/")
 	splitAddr := strings.Split(ip[0], ".")
-	fmt.Println(addrs)
 	if len(splitAddr) != 4 {
 		panic("something went wrong with Ip address")
 	}
 
 	broadcastIp := splitAddr[0] + "." + splitAddr[1] + "." + splitAddr[2] + ".255"
-	fmt.Println(broadcastIp)
 	return net.ParseIP(ip[0]), ief.HardwareAddr, net.ParseIP(broadcastIp)
 
 }

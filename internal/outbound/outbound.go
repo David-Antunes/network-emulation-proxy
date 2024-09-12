@@ -76,8 +76,12 @@ func (outbound *Outbound) Close() {
 
 func (outbound *Outbound) Start() {
 	if !outbound.running {
-		outLog.Println("Starting outbound routines.")
+		outLog.Println("Starting...")
+		outLog.Println("Spawned 4 send routines")
 		outbound.running = true
+		go outbound.send()
+		go outbound.send()
+		go outbound.send()
 		go outbound.send()
 		go outbound.receive()
 	}
@@ -111,23 +115,29 @@ func (outbound *Outbound) send() {
 
 			packet = gopacket.NewPacket(frame.FramePointer[:frame.FrameSize], layers.LayerTypeEthernet, gopacket.Default)
 			eth = packet.Layer(layers.LayerTypeEthernet).(*layers.Ethernet)
-			ip = packet.Layer(layers.LayerTypeIPv4).(*layers.IPv4)
-			if tcpLayer = packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
-				tcp = tcpLayer.(*layers.TCP)
-				err := tcp.SetNetworkLayerForChecksum(ip)
-				if err != nil {
+			if packet.Layer(layers.LayerTypeIPv4) != nil {
+				ip = packet.Layer(layers.LayerTypeIPv4).(*layers.IPv4)
+				if tcpLayer = packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
+					tcp = tcpLayer.(*layers.TCP)
+					err := tcp.SetNetworkLayerForChecksum(ip)
 
-					internal.ShutdownAndLog(err)
+					if err != nil {
+						internal.ShutdownAndLog(err)
+						continue
+					}
+				} else {
+					if err := syscall.Sendto(outbound.fd, frame.FramePointer, 0, outbound.addr); err != nil {
+						internal.ShutdownAndLog(err)
+						continue
+					}
 					continue
 				}
 			} else {
-
 				if err := syscall.Sendto(outbound.fd, frame.FramePointer, 0, outbound.addr); err != nil {
 					internal.ShutdownAndLog(err)
 					continue
 				}
 				continue
-
 			}
 
 			buf := gopacket.NewSerializeBuffer()

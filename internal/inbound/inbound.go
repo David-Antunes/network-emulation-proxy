@@ -30,7 +30,7 @@ type Inbound struct {
 	ctx     chan struct{}
 }
 
-var inLog = log.New(os.Stdout, "inbound INFO: ", log.Ltime)
+var inLog = log.New(os.Stdout, "INBOUND INFO: ", log.Ltime)
 
 func CreateInbound(gateway chan *xdp.Frame) *Inbound {
 	return &Inbound{
@@ -48,7 +48,7 @@ func (inbound *Inbound) AddSocket(iface string, socket xdp.Isocket) {
 	if _, ok := inbound.sockets[iface]; !ok {
 		inbound.sockets[iface] = socket
 		go inbound.pollSocket(socket)
-		inLog.Println("Setup local socket for", iface, "interface")
+		inLog.Println("Registered socket for", iface)
 	}
 	inbound.Unlock()
 }
@@ -57,6 +57,7 @@ func (inbound *Inbound) RemoveSocket(iface string) {
 	inbound.Lock()
 	if sock, ok := inbound.sockets[iface]; ok {
 		delete(inbound.sockets, iface)
+		inLog.Println("Removed socket from", iface)
 		sock.Close()
 	}
 	inbound.Unlock()
@@ -74,7 +75,7 @@ func (inbound *Inbound) pollSocket(socket xdp.Isocket) {
 		return
 	}
 
-	inLog.Println("Found MAC address: ", net.HardwareAddr(frames[0].MacOrigin))
+	inLog.Println("Received MAC:", net.HardwareAddr(frames[0].MacOrigin))
 
 	for _, frame := range frames {
 		inbound.queue <- frame
@@ -101,6 +102,7 @@ func (inbound *Inbound) Start() {
 	if !inbound.running {
 		inbound.running = true
 		go inbound.send()
+		inLog.Println("Started")
 	}
 }
 
@@ -117,6 +119,7 @@ func (inbound *Inbound) send() {
 
 func (inbound *Inbound) Stop() {
 	inbound.ctx <- struct{}{}
+	inLog.Println("Stopped")
 }
 
 func (inbound *Inbound) Close() {
@@ -127,4 +130,5 @@ func (inbound *Inbound) Close() {
 		sock.Close()
 	}
 	inbound.Unlock()
+	inLog.Println("Closed")
 }
