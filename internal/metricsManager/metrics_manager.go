@@ -78,6 +78,7 @@ func htons(i uint16) uint16 {
 
 func (manager *MetricsManager) Close() {
 	manager.iface.Close()
+	manager.metricsSocket.Close()
 	err := syscall.Close(manager.fd)
 	if err != nil {
 		fmt.Println(err)
@@ -216,5 +217,5 @@ func receive(payload []byte, request *api.RTTRequest) error {
 }
 
 func (manager *MetricsManager) Publish() {
-
+	manager.metricsSocket.sendRTT(manager.receiveLatency, manager.transmitLatency)
 }
