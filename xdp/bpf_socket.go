@@ -49,8 +49,8 @@ func (sock *XdpBpfSock) Send(frames []*Frame) {
 	sock.xdp.Send(frames)
 }
 
-func (sock *XdpBpfSock) Receive() ([]*Frame, error) {
-	return sock.xdp.Receive()
+func (sock *XdpBpfSock) Receive(timeout int) ([]*Frame, error) {
+	return sock.xdp.Receive(timeout)
 }
 
 func (sock *XdpBpfSock) Close() {

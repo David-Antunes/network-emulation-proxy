@@ -36,8 +36,8 @@ func CreateXdpSock(queue int, ifname string) (*XdpSock, error) {
 	return &XdpSock{uuid.New(), *xsk, link, []xdp.Desc{}}, nil
 }
 
-func (socket XdpSock) Receive() ([]*Frame, error) {
-	numRx, _, err := socket.sock.Poll(-1)
+func (socket XdpSock) Receive(timeout int) ([]*Frame, error) {
+	numRx, _, err := socket.sock.Poll(timeout)
 
 	if err != nil {
 		return nil, err

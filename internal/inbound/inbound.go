@@ -67,7 +67,7 @@ func (inbound *Inbound) pollSocket(socket xdp.Isocket) {
 	var frames []*xdp.Frame
 	var err error
 	for len(frames) == 0 {
-		frames, err = socket.Receive()
+		frames, err = socket.Receive(-1)
 	}
 	if err != nil {
 		fmt.Println(err)
@@ -82,7 +82,7 @@ func (inbound *Inbound) pollSocket(socket xdp.Isocket) {
 
 	for {
 
-		frames, err = socket.Receive()
+		frames, err = socket.Receive(-1)
 		if err != nil {
 			fmt.Println(err)
 			return

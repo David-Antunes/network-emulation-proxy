@@ -4,6 +4,6 @@ type Isocket interface {
 	ID() string
 	SendFrame(*Frame)
 	Send([]*Frame)
-	Receive() ([]*Frame, error)
+	Receive(int) ([]*Frame, error)
 	Close()
 }

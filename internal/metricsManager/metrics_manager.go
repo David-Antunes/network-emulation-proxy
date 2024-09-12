@@ -10,9 +10,13 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"net"
+	"runtime/debug"
 	"syscall"
 	"time"
 )
+
+// Magic number to align json
+var magicNumber = 34
 
 type MetricsManager struct {
 	iface           xdp.Isocket
@@ -21,14 +25,13 @@ type MetricsManager struct {
 	port            int
 	fd              int
 	addr            *syscall.SockaddrLinklayer
-	socketPath      string
 	receiveLatency  time.Duration
 	transmitLatency time.Duration
 	tests           []api.RTTRequest
 	currConnection  *api.StartTestRequest
 }
 
-func NewMetricsManager(unixPath string, iface xdp.Isocket, mac net.HardwareAddr, ip net.IP, port int) *MetricsManager {
+func NewMetricsManager(iface xdp.Isocket, mac net.HardwareAddr, ip net.IP, port int, endpoint *api.StartTestRequest) *MetricsManager {
 
 	fd, err := syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, int(htons(syscall.ETH_P_IP)))
 	if err != nil {
@@ -54,11 +57,10 @@ func NewMetricsManager(unixPath string, iface xdp.Isocket, mac net.HardwareAddr,
 		port:            port,
 		fd:              fd,
 		addr:            addr,
-		socketPath:      unixPath,
 		receiveLatency:  0,
 		transmitLatency: 0,
 		tests:           make([]api.RTTRequest, 5),
-		currConnection:  nil,
+		currConnection:  endpoint,
 	}
 }
 
@@ -76,50 +78,46 @@ func (manager *MetricsManager) Close() {
 
 func (manager *MetricsManager) Start() {
 
-	frames, err := manager.iface.Receive()
+	var frames []*xdp.Frame
+	var err error
 
-	if err != nil {
-		fmt.Println(err)
-		syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
-		return
-	}
 	for {
+		time.Sleep(time.Second * 5)
+		manager.tests = make([]api.RTTRequest, 0, 5)
 
-		for _, frame := range frames {
-			startTest := &api.StartTestRequest{}
-			err = receive(frame.FramePointer[:frame.FrameSize], startTest)
-			if err != nil {
-				continue
-			} else {
-				manager.currConnection = startTest
-				break
-			}
-
-		}
-		for i := 5; i < 5; i++ {
+		for i := 0; i < 5; i++ {
 			_, err = manager.sendTest()
 			if err != nil {
+				fmt.Println(err)
 				break
 			}
-			frames, err = manager.iface.Receive()
+			frames, err = manager.iface.Receive(int(time.Second.Milliseconds()))
+			if len(frames) == 0 {
+				fmt.Println("No frames received")
+				break
+			}
 			req := &api.RTTRequest{}
 			for _, frame := range frames {
 				err = receive(frame.FramePointer[:frame.FrameSize], req)
 				if err != nil {
+					fmt.Println(err)
 					continue
 				} else {
 					break
 				}
 			}
-			if req == nil {
-				break
-			}
 			req.EndTime = time.Now()
+
+			//fmt.Println("StartTime:", req.StartTime)
+			//fmt.Println("ReceiveTime:", req.ReceiveTime)
+			//fmt.Println("TransmitTime:", req.TransmitTime)
+			//fmt.Println("EndTime:", req.EndTime)
 			manager.tests = append(manager.tests, *req)
 		}
 		if len(manager.tests) == 5 {
-			break
+			manager.calculateAvg()
 		}
+
 	}
 
 }
@@ -135,6 +133,8 @@ func (manager *MetricsManager) calculateAvg() {
 
 	manager.receiveLatency = accReceive / 5
 	manager.transmitLatency = accTransmit / 5
+	fmt.Println("receiveLtency:", manager.receiveLatency)
+	fmt.Println("transmitLatency:", manager.transmitLatency)
 }
 
 func (manager *MetricsManager) sendTest() (api.RTTRequest, error) {
@@ -145,12 +145,12 @@ func (manager *MetricsManager) sendTest() (api.RTTRequest, error) {
 		EndTime:      time.Time{},
 	})
 	if err != nil {
+		fmt.Println(req)
 		return api.RTTRequest{}, err
 	}
 	buf := gopacket.NewSerializeBuffer()
 	var layersToSerialize []gopacket.SerializableLayer
 
-	// Automatically include the Ethernet layer if MAC addresses are provided
 	ethLayer := &layers.Ethernet{
 		SrcMAC:       manager.mac,
 		DstMAC:       manager.currConnection.Mac,
@@ -158,7 +158,6 @@ func (manager *MetricsManager) sendTest() (api.RTTRequest, error) {
 	}
 	layersToSerialize = append(layersToSerialize, ethLayer)
 
-	// Set IP layer
 	ipLayer := &layers.IPv4{
 		Version:  4,
 		TTL:      64,
@@ -171,14 +170,14 @@ func (manager *MetricsManager) sendTest() (api.RTTRequest, error) {
 		SrcPort: layers.UDPPort(manager.port),
 		DstPort: layers.UDPPort(manager.currConnection.Port),
 	}
-	udpLayer.SetNetworkLayerForChecksum(ipLayer) // Important for checksum calculation
+	udpLayer.SetNetworkLayerForChecksum(ipLayer)
 	layersToSerialize = append(layersToSerialize, udpLayer)
 
-	// Optionally, fill the payload with data
 	layersToSerialize = append(layersToSerialize, gopacket.Payload(req))
 
 	if err = gopacket.SerializeLayers(buf, gopacket.SerializeOptions{ComputeChecksums: true, FixLengths: true}, layersToSerialize...); err != nil {
 		fmt.Println(err)
+		debug.PrintStack()
 		syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
 		return api.RTTRequest{}, err
 	}
@@ -191,13 +190,14 @@ func (manager *MetricsManager) sendTest() (api.RTTRequest, error) {
 	return api.RTTRequest{}, nil
 }
 
-func receive(payload []byte, request any) error {
-	packet := gopacket.NewPacket(payload, layers.LayerTypeIPv4, gopacket.Default)
+func receive(payload []byte, request *api.RTTRequest) error {
+	packet := gopacket.NewPacket(payload, layers.LayerTypeUDP, gopacket.Default)
+
 	if udpLayer := packet.Layer(layers.LayerTypeUDP); udpLayer != nil {
 		udp := udpLayer.(*layers.UDP)
 
-		d := json.NewDecoder(bytes.NewReader(udp.Payload))
-		err := d.Decode(&request)
+		d := json.NewDecoder(bytes.NewReader(udp.Payload[magicNumber:]))
+		err := d.Decode(request)
 		if err != nil {
 			return err
 		}
