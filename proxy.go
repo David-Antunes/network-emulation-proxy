@@ -1,14 +1,6 @@
 package main
 
 import (
-	"github.com/David-Antunes/network-emulation-proxy/internal/conn"
-	"github.com/David-Antunes/network-emulation-proxy/internal/daemon"
-	"github.com/David-Antunes/network-emulation-proxy/internal/inbound"
-	"github.com/David-Antunes/network-emulation-proxy/internal/metricsManager"
-	"github.com/David-Antunes/network-emulation-proxy/internal/outbound"
-	"github.com/David-Antunes/network-emulation-proxy/internal/unix-socket"
-	"github.com/David-Antunes/network-emulation-proxy/xdp"
-	"github.com/spf13/viper"
 	"log"
 	"net"
 	"os"
@@ -16,6 +8,15 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/David-Antunes/network-emulation-proxy/internal/conn"
+	"github.com/David-Antunes/network-emulation-proxy/internal/daemon"
+	"github.com/David-Antunes/network-emulation-proxy/internal/inbound"
+	"github.com/David-Antunes/network-emulation-proxy/internal/metricsManager"
+	"github.com/David-Antunes/network-emulation-proxy/internal/outbound"
+	unixsocket "github.com/David-Antunes/network-emulation-proxy/internal/unix-socket"
+	"github.com/David-Antunes/network-emulation-proxy/xdp"
+	"github.com/spf13/viper"
 )
 
 var proxyLog = log.New(os.Stdout, "PROXY INFO: ", log.Ltime)
@@ -40,7 +41,6 @@ func main() {
 		viper.Set("PROXY_RTT_SOCKET", "/tmp/proxy-rtt.sock")
 		viper.Set("TIMEOUT", time.Second*60)
 		viper.Set("NUM_TESTS", 5)
-		viper.SetConfigType("env")
 		viper.WriteConfigAs(".env")
 	} else {
 		if !viper.IsSet("PROXY_SOCKET") {

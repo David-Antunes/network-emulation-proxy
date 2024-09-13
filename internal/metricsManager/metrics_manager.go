@@ -5,18 +5,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/David-Antunes/network-emulation-proxy/api"
-	"github.com/David-Antunes/network-emulation-proxy/internal"
-	"github.com/David-Antunes/network-emulation-proxy/internal/conn"
-	"github.com/David-Antunes/network-emulation-proxy/xdp"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
 	"log"
 	"net"
 	"os"
 	"runtime/debug"
 	"syscall"
 	"time"
+
+	"github.com/David-Antunes/network-emulation-proxy/api"
+	"github.com/David-Antunes/network-emulation-proxy/internal"
+	"github.com/David-Antunes/network-emulation-proxy/internal/conn"
+	"github.com/David-Antunes/network-emulation-proxy/xdp"
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 )
 
 // Magic number to align json
@@ -113,19 +114,19 @@ func (manager *MetricsManager) Start() {
 		for i := 0; i < 5; i++ {
 			_, err = manager.sendTest()
 			if err != nil {
-				fmt.Println(err)
+				metricsLog.Println(err)
 				break
 			}
 			frames, err = manager.iface.Receive(int(time.Second.Milliseconds()))
 			if len(frames) == 0 {
-				fmt.Println("No frames received")
+				metricsLog.Println("No frames received")
 				break
 			}
 			req := &api.RTTRequest{}
 			for _, frame := range frames {
 				err = receive(frame.FramePointer[:frame.FrameSize], req)
 				if err != nil {
-					fmt.Println(err)
+					metricsLog.Println(err)
 					continue
 				} else {
 					break
