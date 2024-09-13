@@ -41,7 +41,7 @@ func main() {
 		viper.Set("PROXY_RTT_SOCKET", "/tmp/proxy-rtt.sock")
 		viper.Set("TIMEOUT", time.Second*60)
 		viper.Set("NUM_TESTS", 5)
-    viper.SetConfigType("env")
+		viper.SetConfigType("env")
 		viper.WriteConfigAs(".env")
 	} else {
 		if !viper.IsSet("PROXY_SOCKET") {
@@ -101,8 +101,10 @@ func main() {
 
 	server.SearchInterfaces(nil, nil)
 	go func() {
-		time.Sleep(10 * time.Second)
-		server.SearchInterfaces(nil, nil)
+		for {
+			time.Sleep(10 * time.Second)
+			server.SearchInterfaces(nil, nil)
+		}
 	}()
 
 	err = unixsocket.StartSocket()
