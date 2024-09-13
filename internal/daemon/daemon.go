@@ -2,15 +2,16 @@ package daemon
 
 import (
 	"errors"
-	"github.com/David-Antunes/network-emulation-proxy/internal"
-	"github.com/David-Antunes/network-emulation-proxy/internal/inbound"
-	"github.com/David-Antunes/network-emulation-proxy/internal/outbound"
-	"github.com/David-Antunes/network-emulation-proxy/xdp"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"sync"
+
+	"github.com/David-Antunes/network-emulation-proxy/internal"
+	"github.com/David-Antunes/network-emulation-proxy/internal/inbound"
+	"github.com/David-Antunes/network-emulation-proxy/internal/outbound"
+	"github.com/David-Antunes/network-emulation-proxy/xdp"
 )
 
 var serverLog = log.New(os.Stdout, "SERVER INFO: ", log.Ltime)
@@ -74,6 +75,7 @@ func (d *Daemon) Serve() {
 }
 
 func (d *Daemon) SearchInterfaces(w http.ResponseWriter, r *http.Request) {
+	serverLog.Println("Searching for network interfaces")
 	d.Lock()
 	ifaces, err := net.Interfaces()
 
