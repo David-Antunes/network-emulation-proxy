@@ -35,33 +35,15 @@ func cleanup(d *daemon.Daemon, m *metricsManager.MetricsManager) {
 func main() {
 
 	viper.SetConfigFile(".env")
-	if err := viper.ReadInConfig(); err != nil {
-		viper.Set("PROXY_SOCKET", "/tmp/proxy.sock")
-		viper.Set("PROXY_SERVER", "/tmp/proxy-server.sock")
-		viper.Set("PROXY_RTT_SOCKET", "/tmp/proxy-rtt.sock")
-		viper.Set("TIMEOUT", time.Second*60)
-		viper.Set("NUM_TESTS", 5)
+	viper.ReadInConfig();
+		viper.SetDefault("PROXY_SOCKET", "/tmp/proxy.sock")
+		viper.SetDefault("PROXY_SERVER", "/tmp/proxy-server.sock")
+		viper.SetDefault("PROXY_RTT_SOCKET", "/tmp/proxy-rtt.sock")
+		viper.SetDefault("TIMEOUT", 60000)
+		viper.SetDefault("NUM_TESTS", 5)
 		viper.SetConfigType("env")
 		viper.WriteConfigAs(".env")
-	} else {
-		if !viper.IsSet("PROXY_SOCKET") {
-			viper.Set("PROXY_SOCKET", "/tmp/proxy.sock")
-		}
-		if !viper.IsSet("PROXY_SERVER") {
-			viper.Set("PROXY_SERVER", "/tmp/proxy-server.sock")
-		}
-		if !viper.IsSet("PROXY_RTT_SOCKET") {
-			viper.Set("PROXY_RTT_SOCKET", "/tmp/proxy-rtt.sock")
-		}
-		if !viper.IsSet("TIMEOUT") {
-			viper.Set("TIMEOUT", 60000)
-		}
-		if !viper.IsSet("NUM_TESTS") {
-			viper.Set("NUM_TESTS", 5)
-		}
-		viper.SetConfigType("env")
-		viper.WriteConfigAs(".env")
-	}
+
 
 	for id, value := range viper.AllSettings() {
 		proxyLog.Println(id, value)
