@@ -64,6 +64,8 @@ func NewMetricsManager(iface xdp.Isocket, mac net.HardwareAddr, ip net.IP, port 
 		internal.ShutdownAndLog(err)
 	}
 
+	go metricsSocket.StartSocket()
+
 	return &MetricsManager{
 		iface:           iface,
 		mac:             mac,
@@ -142,6 +144,7 @@ func (manager *MetricsManager) Start() {
 		}
 		if len(manager.tests) == manager.numTests {
 			manager.calculateAvg()
+			manager.metricsSocket.sendRTT(manager.receiveLatency, manager.transmitLatency)
 		}
 
 		time.Sleep(manager.timeout)

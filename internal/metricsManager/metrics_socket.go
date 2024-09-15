@@ -3,9 +3,10 @@ package metricsManager
 import (
 	"encoding/gob"
 	"fmt"
+	"time"
+
 	"github.com/David-Antunes/network-emulation-proxy/api"
 	"github.com/David-Antunes/network-emulation-proxy/xdp"
-	"time"
 
 	"net"
 	"os"
@@ -58,10 +59,11 @@ func (s *MetricsSocket) sendRTT(receiveLatency time.Duration, transmitLatency ti
 		if err == nil {
 			currentConnections = append(currentConnections, conn)
 		} else {
+			conn.Close()
 			fmt.Println(err)
 		}
 	}
-
+	s.conn = currentConnections
 	metricsLog.Println("Published results")
 }
 
