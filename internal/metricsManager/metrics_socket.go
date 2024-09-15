@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/David-Antunes/network-emulation-proxy/api"
-	"github.com/David-Antunes/network-emulation-proxy/xdp"
 
 	"net"
 	"os"
@@ -15,9 +14,8 @@ import (
 type MetricsSocket struct {
 	socketPath string
 	sock       net.Listener
-	read       chan *xdp.Frame
-	write      chan *xdp.Frame
 	conn       []net.Conn
+	encs       []*gob.Encoder
 	closed     bool
 }
 
@@ -30,6 +28,7 @@ func NewMetricsSocket(socketPath string) (*MetricsSocket, error) {
 		socketPath: socketPath,
 		sock:       listen,
 		conn:       make([]net.Conn, 0),
+		encs:       make([]*gob.Encoder, 0),
 		closed:     false,
 	}, nil
 }
@@ -43,27 +42,30 @@ func (s *MetricsSocket) StartSocket() error {
 			return nil
 		}
 		s.conn = append(s.conn, conn)
+		s.encs = append(s.encs, gob.NewEncoder(conn))
 	}
 }
 
 func (s *MetricsSocket) sendRTT(receiveLatency time.Duration, transmitLatency time.Duration) {
 	currentConnections := make([]net.Conn, 0)
-	for _, conn := range s.conn {
-		enc := gob.NewEncoder(conn)
+	currEncs := make([]*gob.Encoder, 0)
+	for i, conn := range s.conn {
 
-		err := enc.Encode(&api.UpdateRTTRequest{
+		err := s.encs[i].Encode(&api.UpdateRTTRequest{
 			ReceiveLatency:  receiveLatency,
 			TransmitLatency: transmitLatency,
 		})
 
 		if err == nil {
 			currentConnections = append(currentConnections, conn)
+			currEncs = append(currEncs, s.encs[i])
 		} else {
 			conn.Close()
 			fmt.Println(err)
 		}
 	}
 	s.conn = currentConnections
+	s.encs = currEncs
 	metricsLog.Println("Published results")
 }
 
