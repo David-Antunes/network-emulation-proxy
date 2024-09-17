@@ -49,7 +49,7 @@ func NewMetricsManager(iface xdp.Isocket, mac net.HardwareAddr, ip net.IP, port 
 		return nil
 	}
 
-	ifi, err := net.InterfaceByName("veth1")
+	ifi, err := net.InterfaceByName("br0")
 	if err != nil {
 		internal.ShutdownAndLog(err)
 		return nil
