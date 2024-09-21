@@ -9,9 +9,6 @@ import (
 	"os"
 	"sync"
 	"syscall"
-
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
 )
 
 type Outbound struct {
@@ -80,9 +77,6 @@ func (outbound *Outbound) Start() {
 		outLog.Println("Spawned 4 send routines")
 		outbound.running = true
 		go outbound.send()
-		go outbound.send()
-		go outbound.send()
-		go outbound.send()
 		go outbound.receive()
 	}
 }
@@ -100,12 +94,6 @@ func (outbound *Outbound) receive() {
 }
 
 func (outbound *Outbound) send() {
-
-	var packet gopacket.Packet
-	var eth *layers.Ethernet
-	var ip *layers.IPv4
-	var tcpLayer gopacket.Layer
-	var tcp *layers.TCP
 	for {
 		select {
 		case <-outbound.ctx:
@@ -113,40 +101,7 @@ func (outbound *Outbound) send() {
 
 		case frame := <-outbound.queue:
 
-			packet = gopacket.NewPacket(frame.FramePointer[:frame.FrameSize], layers.LayerTypeEthernet, gopacket.Default)
-			eth = packet.Layer(layers.LayerTypeEthernet).(*layers.Ethernet)
-			if packet.Layer(layers.LayerTypeIPv4) != nil {
-				ip = packet.Layer(layers.LayerTypeIPv4).(*layers.IPv4)
-				if tcpLayer = packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
-					tcp = tcpLayer.(*layers.TCP)
-					err := tcp.SetNetworkLayerForChecksum(ip)
-
-					if err != nil {
-						internal.ShutdownAndLog(err)
-						continue
-					}
-				} else {
-					if err := syscall.Sendto(outbound.fd, frame.FramePointer, 0, outbound.addr); err != nil {
-						internal.ShutdownAndLog(err)
-						continue
-					}
-					continue
-				}
-			} else {
-				if err := syscall.Sendto(outbound.fd, frame.FramePointer, 0, outbound.addr); err != nil {
-					internal.ShutdownAndLog(err)
-					continue
-				}
-				continue
-			}
-
-			buf := gopacket.NewSerializeBuffer()
-			if err := gopacket.SerializeLayers(buf, gopacket.SerializeOptions{ComputeChecksums: true, FixLengths: true}, eth, ip, tcp, gopacket.Payload(tcp.LayerPayload())); err != nil {
-				internal.ShutdownAndLog(err)
-				continue
-			}
-
-			if err := syscall.Sendto(outbound.fd, buf.Bytes(), 0, outbound.addr); err != nil {
+			if err := syscall.Sendto(outbound.fd, frame.FramePointer, 0, outbound.addr); err != nil {
 				internal.ShutdownAndLog(err)
 				continue
 			}

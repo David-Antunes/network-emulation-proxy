@@ -1,5 +1,5 @@
 asavie/
 .idea/
 .code/
-proxy
 *.log
+network-emulation-proxy

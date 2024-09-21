@@ -4,6 +4,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"github.com/David-Antunes/network-emulation-proxy/internal"
 
 	"github.com/David-Antunes/network-emulation-proxy/xdp"
 
@@ -23,8 +24,8 @@ type socket struct {
 var s = &socket{
 	socketPath: "",
 	sock:       nil,
-	read:       make(chan *xdp.Frame, 1000),
-	write:      make(chan *xdp.Frame, 1000),
+	read:       make(chan *xdp.Frame, internal.QUEUE_SIZE),
+	write:      make(chan *xdp.Frame, internal.QUEUE_SIZE),
 	conn:       nil,
 	closed:     false,
 }

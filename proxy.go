@@ -1,12 +1,11 @@
 package main
 
 import (
+	"github.com/David-Antunes/network-emulation-proxy/internal"
 	"log"
 	"net"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/David-Antunes/network-emulation-proxy/internal/conn"
@@ -22,10 +21,8 @@ import (
 var proxyLog = log.New(os.Stdout, "PROXY INFO: ", log.Ltime)
 
 func cleanup(d *daemon.Daemon, m *metricsManager.MetricsManager) {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
-		<-c
+		<-internal.Stop
 		d.Cleanup()
 		unixsocket.Close()
 		m.Close()
@@ -35,15 +32,14 @@ func cleanup(d *daemon.Daemon, m *metricsManager.MetricsManager) {
 func main() {
 
 	viper.SetConfigFile(".env")
-	viper.ReadInConfig();
-		viper.SetDefault("PROXY_SOCKET", "/tmp/proxy.sock")
-		viper.SetDefault("PROXY_SERVER", "/tmp/proxy-server.sock")
-		viper.SetDefault("PROXY_RTT_SOCKET", "/tmp/proxy-rtt.sock")
-		viper.SetDefault("TIMEOUT", 60000)
-		viper.SetDefault("NUM_TESTS", 5)
-		viper.SetConfigType("env")
-		viper.WriteConfigAs(".env")
-
+	viper.ReadInConfig()
+	viper.SetDefault("PROXY_SOCKET", "/tmp/proxy.sock")
+	viper.SetDefault("PROXY_SERVER", "/tmp/proxy-server.sock")
+	viper.SetDefault("PROXY_RTT_SOCKET", "/tmp/proxy-rtt.sock")
+	viper.SetDefault("TIMEOUT", 60000)
+	viper.SetDefault("NUM_TESTS", 5)
+	viper.SetConfigType("env")
+	viper.WriteConfigAs(".env")
 
 	for id, value := range viper.AllSettings() {
 		proxyLog.Println(id, value)
@@ -82,12 +78,6 @@ func main() {
 	out.Start()
 
 	server.SearchInterfaces(nil, nil)
-	go func() {
-		for {
-			time.Sleep(10 * time.Second)
-			server.SearchInterfaces(nil, nil)
-		}
-	}()
 
 	err = unixsocket.StartSocket()
 	if err != nil {
