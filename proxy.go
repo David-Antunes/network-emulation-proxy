@@ -77,8 +77,6 @@ func main() {
 	in.Start()
 	out.Start()
 
-	server.SearchInterfaces(nil, nil)
-
 	err = unixsocket.StartSocket()
 	if err != nil {
 		return
