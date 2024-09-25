@@ -16,7 +16,7 @@ type XdpSock struct {
 	descs []xdp.Desc
 }
 
-func (socket XdpSock) ID() string {
+func (socket *XdpSock) ID() string {
 	return socket.id.String()
 }
 
@@ -33,10 +33,12 @@ func CreateXdpSock(queue int, ifname string) (*XdpSock, error) {
 		return nil, err
 	}
 	xsk.Fill(xsk.GetDescs(xsk.NumFreeFillSlots(), true))
-	return &XdpSock{uuid.New(), *xsk, link, []xdp.Desc{}}, nil
+	descs := xsk.GetDescs(xsk.NumFreeTxSlots(), false)
+
+	return &XdpSock{uuid.New(), *xsk, link, descs}, nil
 }
 
-func (socket XdpSock) Receive(timeout int) ([]*Frame, error) {
+func (socket *XdpSock) Receive(timeout int) ([]*Frame, error) {
 	numRx, _, err := socket.sock.Poll(timeout)
 
 	if err != nil {
@@ -65,14 +67,8 @@ func (socket XdpSock) Receive(timeout int) ([]*Frame, error) {
 	return []*Frame{}, nil
 }
 
-func (socket XdpSock) SendFrame(frame *Frame) {
+func (socket *XdpSock) SendFrame(frame *Frame) {
 
-	_, _, err := socket.sock.Poll(1)
-
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
 	txDescs := socket.getTransmitDescs(1)
 
 	if len(txDescs) > 0 {
@@ -82,13 +78,8 @@ func (socket XdpSock) SendFrame(frame *Frame) {
 	}
 }
 
-func (socket XdpSock) Send(frames []*Frame) {
-	_, _, err := socket.sock.Poll(1)
+func (socket *XdpSock) Send(frames []*Frame) {
 
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
 	txDescs := socket.getTransmitDescs(len(frames))
 
 	for i := 0; i < len(txDescs); i++ {
@@ -98,20 +89,23 @@ func (socket XdpSock) Send(frames []*Frame) {
 	socket.sock.Transmit(txDescs)
 }
 
-func (socket XdpSock) getTransmitDescs(number int) []xdp.Desc {
-	if len(socket.descs) < number {
+func (socket *XdpSock) getTransmitDescs(number int) []xdp.Desc {
+	for len(socket.descs) < number {
+		_, _, err := socket.sock.Poll(-1)
+		if err != nil {
+			fmt.Println(err)
+			return socket.descs
+		}
 		socket.descs = socket.sock.GetDescs(socket.sock.NumFreeTxSlots(), false)
+		//fmt.Println("refill", len(socket.descs), number)
 	}
-	if len(socket.descs) < number {
-		return socket.descs
-	} else {
-		descs := socket.descs[0:number]
-		socket.descs = socket.descs[number:]
-		return descs
-	}
+	descs := socket.descs[:number]
+	socket.descs = socket.descs[number:]
+	//fmt.Println("give", len(socket.descs), number)
+	return descs
 }
 
-func (socket XdpSock) Close() {
+func (socket *XdpSock) Close() {
 	err := socket.sock.Close()
 	if err != nil {
 		fmt.Println(err)

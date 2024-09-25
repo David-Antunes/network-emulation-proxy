@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"errors"
+	"github.com/David-Antunes/network-emulation-proxy/internal/proxy"
 	"log"
 	"net"
 	"net/http"
@@ -9,24 +10,20 @@ import (
 	"sync"
 
 	"github.com/David-Antunes/network-emulation-proxy/internal"
-	"github.com/David-Antunes/network-emulation-proxy/internal/inbound"
-	"github.com/David-Antunes/network-emulation-proxy/internal/outbound"
-	"github.com/David-Antunes/network-emulation-proxy/xdp"
 )
 
 var serverLog = log.New(os.Stdout, "SERVER INFO: ", log.Ltime)
 
 type Daemon struct {
 	sync.Mutex
-	in         *inbound.Inbound
-	out        *outbound.Outbound
-	unixPath   string
-	httpServer *http.Server
-	socket     net.Listener
-	interfaces map[string]struct{}
+	unixPath     string
+	httpServer   *http.Server
+	socket       net.Listener
+	interfaces   map[string]struct{}
+	proxySockets map[string]*proxy.ProxySocket
 }
 
-func NewDaemon(in *inbound.Inbound, out *outbound.Outbound, unixPath string) *Daemon {
+func NewDaemon(unixPath string) *Daemon {
 
 	s, err := net.Listen("unix", unixPath)
 	if err != nil {
@@ -44,13 +41,12 @@ func NewDaemon(in *inbound.Inbound, out *outbound.Outbound, unixPath string) *Da
 	interfaces["lo"] = struct{}{}
 
 	d := &Daemon{
-		Mutex:      sync.Mutex{},
-		in:         in,
-		out:        out,
-		unixPath:   unixPath,
-		httpServer: nil,
-		socket:     nil,
-		interfaces: interfaces,
+		Mutex:        sync.Mutex{},
+		unixPath:     unixPath,
+		httpServer:   nil,
+		socket:       nil,
+		interfaces:   interfaces,
+		proxySockets: make(map[string]*proxy.ProxySocket),
 	}
 
 	m := http.NewServeMux()
@@ -99,21 +95,23 @@ func (d *Daemon) SearchInterfaces(w http.ResponseWriter, r *http.Request) {
 
 	for _, iface := range newIfaces {
 		serverLog.Println("Found interface:", iface)
-		sock, err := xdp.CreateXdpBpfSock(0, iface)
+		s, err := proxy.NewProxySocket(0, iface)
 		if err != nil {
-			serverLog.Println("Error creating socket: " + err.Error())
-			continue
+			internal.ShutdownAndLog(err)
+			return
 		}
-		d.in.AddSocket(iface, sock)
+		d.proxySockets[iface] = s
+		go s.Bootstrap()
 	}
 	d.Unlock()
 }
 
 func (d *Daemon) Cleanup() {
-	d.in.Close()
+	for _, s := range d.proxySockets {
+		s.Close()
+	}
 	d.socket.Close()
 	d.httpServer.Close()
 	os.Remove(d.unixPath)
-	d.out.Close()
 	serverLog.Println("Closed")
 }

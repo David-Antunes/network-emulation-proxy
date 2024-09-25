@@ -1,13 +1,13 @@
 package inbound
 
 import (
-	"fmt"
+	"encoding/gob"
 	"github.com/David-Antunes/network-emulation-proxy/internal"
+	"github.com/David-Antunes/network-emulation-proxy/internal/outbound"
+	"github.com/David-Antunes/network-emulation-proxy/internal/proxy"
 	"github.com/David-Antunes/network-emulation-proxy/xdp"
 	"log"
-	"net"
 	"os"
-	"sync"
 )
 
 /*
@@ -22,113 +22,57 @@ Requires Garbage collection logic to be configured before starting its main go
 routine.
 */
 type Inbound struct {
-	sync.Mutex
-	sockets map[string]xdp.Isocket
+	sockets map[string]*proxy.ProxySocket
 	queue   chan *xdp.Frame
-	running bool
-	gateway chan *xdp.Frame
-	ctx     chan struct{}
+	out     *outbound.Outbound
+	enc     *gob.Encoder
 }
 
 var inLog = log.New(os.Stdout, "INBOUND INFO: ", log.Ltime)
 
-func CreateInbound(gateway chan *xdp.Frame) *Inbound {
+func CreateInbound(out *outbound.Outbound) *Inbound {
 	return &Inbound{
-		Mutex:   sync.Mutex{},
-		sockets: make(map[string]xdp.Isocket),
+		sockets: make(map[string]*proxy.ProxySocket),
 		queue:   make(chan *xdp.Frame, internal.QUEUE_SIZE),
-		running: false,
-		gateway: gateway,
-		ctx:     make(chan struct{}),
+		out:     out,
+		enc:     nil,
 	}
 }
+func (inbound *Inbound) SetEnc(enc *gob.Encoder) {
+	inbound.enc = enc
+}
 
-func (inbound *Inbound) AddSocket(iface string, socket xdp.Isocket) {
-	inbound.Lock()
+func (inbound *Inbound) AddSocket(iface string) {
 	if _, ok := inbound.sockets[iface]; !ok {
-		inbound.sockets[iface] = socket
-		go inbound.pollSocket(socket)
+		//socket, err := proxy.NewReceiveSocket(0, iface)
+		//if err != nil {
+		//	internal.ShutdownAndLog(err)
+		//	return
+		//}
+		//socket.SetEnc(inbound.enc)
+		//inbound.sockets[iface] = socket
+		//go func() {
+		//
+		//	socket.FindMac()
+		//	inbound.out.AddSocket(socket)
+		//	socket.Receive(-1)
+		//}()
 		inLog.Println("Registered socket for", iface)
 	}
-	inbound.Unlock()
 }
 
 func (inbound *Inbound) RemoveSocket(iface string) {
-	inbound.Lock()
 	if sock, ok := inbound.sockets[iface]; ok {
+		sock.Close()
 		delete(inbound.sockets, iface)
 		inLog.Println("Removed socket from", iface)
 		sock.Close()
 	}
-	inbound.Unlock()
-}
-
-func (inbound *Inbound) pollSocket(socket xdp.Isocket) {
-
-	var frames []*xdp.Frame
-	var err error
-	for len(frames) == 0 {
-		frames, err = socket.Receive(-1)
-	}
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	inLog.Println("Received MAC:", net.HardwareAddr(frames[0].MacOrigin))
-
-	for _, frame := range frames {
-		inbound.queue <- frame
-	}
-
-	for {
-
-		frames, err = socket.Receive(-1)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		for _, frame := range frames {
-			if len(inbound.queue) < internal.QUEUE_SIZE {
-				inbound.queue <- frame
-			} else {
-				fmt.Println("Queue Full!")
-			}
-		}
-	}
-}
-
-func (inbound *Inbound) Start() {
-	if !inbound.running {
-		inbound.running = true
-		go inbound.send()
-		inLog.Println("Started")
-	}
-}
-
-func (inbound *Inbound) send() {
-	for {
-		select {
-		case <-inbound.ctx:
-			return
-		case frame := <-inbound.queue:
-			inbound.gateway <- frame
-		}
-	}
-}
-
-func (inbound *Inbound) Stop() {
-	inbound.ctx <- struct{}{}
-	inLog.Println("Stopped")
 }
 
 func (inbound *Inbound) Close() {
-	inbound.Lock()
-	inbound.running = false
-	inbound.Stop()
 	for _, sock := range inbound.sockets {
 		sock.Close()
 	}
-	inbound.Unlock()
-	inLog.Println("Closed")
+	inLog.Println("Stopped")
 }

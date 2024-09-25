@@ -10,10 +10,7 @@ import (
 
 	"github.com/David-Antunes/network-emulation-proxy/internal/conn"
 	"github.com/David-Antunes/network-emulation-proxy/internal/daemon"
-	"github.com/David-Antunes/network-emulation-proxy/internal/inbound"
 	"github.com/David-Antunes/network-emulation-proxy/internal/metricsManager"
-	"github.com/David-Antunes/network-emulation-proxy/internal/outbound"
-	unixsocket "github.com/David-Antunes/network-emulation-proxy/internal/unix-socket"
 	"github.com/David-Antunes/network-emulation-proxy/xdp"
 	"github.com/spf13/viper"
 )
@@ -24,7 +21,7 @@ func cleanup(d *daemon.Daemon, m *metricsManager.MetricsManager) {
 	go func() {
 		<-internal.Stop
 		d.Cleanup()
-		unixsocket.Close()
+		//unixsocket.Close()
 		m.Close()
 		os.Exit(1)
 	}()
@@ -49,14 +46,12 @@ func main() {
 	os.Remove(viper.GetString("PROXY_SERVER"))
 	os.Remove(viper.GetString("PROXY_RTT_SOCKET"))
 
-	unixsocket.SetSocketPath(viper.GetString("PROXY_SOCKET"))
+	//unixsocket.SetSocketPath(viper.GetString("PROXY_SOCKET"))
+	//out := outbound.CreateOutbound(unixsocket.GetReadChannel())
+	//in := inbound.CreateInbound(out)
+	server := daemon.NewDaemon(viper.GetString("PROXY_SERVER"))
 
-	out := outbound.CreateOutbound(unixsocket.GetReadChannel())
-	out.SetSocket()
-	in := inbound.CreateInbound(unixsocket.GetWriteChannel())
-
-	server := daemon.NewDaemon(in, out, viper.GetString("PROXY_SERVER"))
-
+	//unixsocket.SetInbound(in)
 	metricsIp, metricsMac, broadcastIP := GetIfaceInformation()
 
 	rtt, err := xdp.CreateXdpBpfSock(0, "veth1")
@@ -71,16 +66,15 @@ func main() {
 	}
 	metrics := metricsManager.NewMetricsManager(rtt, metricsMac, metricsIp, 8000, rttConn, viper.GetString("PROXY_RTT_SOCKET"), time.Duration(viper.GetInt("TIMEOUT"))*time.Millisecond, viper.GetInt("NUM_TESTS"))
 	go metrics.Start()
-	go server.Serve()
+	server.Serve()
 
 	go cleanup(server, metrics)
-	in.Start()
-	out.Start()
+	//out.Start()
 
-	err = unixsocket.StartSocket()
-	if err != nil {
-		return
-	}
+	//err = unixsocket.StartSocket()
+	//if err != nil {
+	//	return
+	//}
 
 }
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/David-Antunes/network-emulation-proxy/internal"
+	"github.com/David-Antunes/network-emulation-proxy/internal/inbound"
 
 	"github.com/David-Antunes/network-emulation-proxy/xdp"
 
@@ -15,8 +16,8 @@ import (
 type socket struct {
 	socketPath string
 	sock       net.Listener
+	in         *inbound.Inbound
 	read       chan *xdp.Frame
-	write      chan *xdp.Frame
 	conn       net.Conn
 	closed     bool
 }
@@ -24,17 +25,18 @@ type socket struct {
 var s = &socket{
 	socketPath: "",
 	sock:       nil,
-	read:       make(chan *xdp.Frame, internal.QUEUE_SIZE),
-	write:      make(chan *xdp.Frame, internal.QUEUE_SIZE),
+	in:         nil,
+	read:       make(chan *xdp.Frame, internal.GOB_QUEUESIZE),
 	conn:       nil,
 	closed:     false,
 }
 
+func SetInbound(in *inbound.Inbound) {
+	s.in = in
+}
+
 func GetReadChannel() chan *xdp.Frame {
 	return s.read
-}
-func GetWriteChannel() chan *xdp.Frame {
-	return s.write
 }
 
 func SetSocketPath(path string) {
@@ -62,8 +64,9 @@ func StartSocket() error {
 			fmt.Println(err)
 			return nil
 		}
-		go sendMsg(conn)
+		enc := gob.NewEncoder(conn)
 		dec := gob.NewDecoder(conn)
+		s.in.SetEnc(enc)
 		for {
 			var frame *xdp.Frame
 
@@ -72,22 +75,8 @@ func StartSocket() error {
 				fmt.Println(err)
 				break
 			}
-			s.read <- frame
-			//fmt.Println(net.HardwareAddr(frame.MacOrigin), net.HardwareAddr(frame.MacDestination), frame.Time)
-		}
-	}
-}
-
-func sendMsg(conn net.Conn) {
-	enc := gob.NewEncoder(conn)
-	for {
-		select {
-		case frame := <-s.write:
-			frame.FramePointer = frame.FramePointer[:frame.FrameSize]
-			err := enc.Encode(frame)
-			if err != nil {
-				fmt.Println(err)
-				return
+			if len(s.read) < internal.GOB_QUEUESIZE {
+				s.read <- frame
 			}
 		}
 	}

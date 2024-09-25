@@ -1,24 +1,20 @@
 package outbound
 
 import (
-	"fmt"
 	"github.com/David-Antunes/network-emulation-proxy/internal"
+	"github.com/David-Antunes/network-emulation-proxy/internal/proxy"
 	"github.com/David-Antunes/network-emulation-proxy/xdp"
 	"log"
-	"net"
 	"os"
 	"sync"
-	"syscall"
 )
 
 type Outbound struct {
 	sync.Mutex
+	sockets map[string]*proxy.ProxySocket
 	gateway chan *xdp.Frame
 	running bool
-	queue   chan *xdp.Frame
-	ctx     chan struct{}
-	fd      int
-	addr    *syscall.SockaddrLinklayer
+	queues  map[string]chan *xdp.Frame
 }
 
 var outLog = log.New(os.Stdout, "outbound INFO: ", log.Ltime)
@@ -26,86 +22,50 @@ var outLog = log.New(os.Stdout, "outbound INFO: ", log.Ltime)
 func CreateOutbound(gateway chan *xdp.Frame) *Outbound {
 	return &Outbound{
 		Mutex:   sync.Mutex{},
+		sockets: make(map[string]*proxy.ProxySocket),
 		gateway: gateway,
 		running: false,
-		queue:   make(chan *xdp.Frame, internal.QUEUE_SIZE),
-		ctx:     make(chan struct{}),
-	}
-}
-
-func (outbound *Outbound) SetSocket() {
-	fd, err := syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, int(htons(syscall.ETH_P_IP)))
-	if err != nil {
-		panic(err)
-	}
-	outbound.fd = fd
-
-	ifi, err := net.InterfaceByName("br0")
-	if err != nil {
-		panic(err)
-	}
-	outbound.addr = &syscall.SockaddrLinklayer{
-		Protocol: htons(syscall.ETH_P_IP),
-		Ifindex:  ifi.Index,
-	}
-}
-func htons(i uint16) uint16 {
-	return (i<<8)&0xff00 | i>>8
-}
-
-func (outbound *Outbound) Stop() {
-	if outbound.running {
-		outbound.ctx <- struct{}{}
-		outbound.ctx <- struct{}{}
-		outbound.running = false
-	}
-}
-
-func (outbound *Outbound) Close() {
-	outbound.ctx <- struct{}{}
-	outbound.ctx <- struct{}{}
-	outbound.running = false
-	err := syscall.Close(outbound.fd)
-	if err != nil {
-		fmt.Println(err)
+		queues:  make(map[string]chan *xdp.Frame),
 	}
 }
 
 func (outbound *Outbound) Start() {
 	if !outbound.running {
 		outLog.Println("Starting...")
-		outLog.Println("Spawned 4 send routines")
-		outbound.running = true
-		go outbound.send()
 		go outbound.receive()
 	}
+}
+
+func (outbound *Outbound) AddSocket(sock *proxy.ProxySocket) {
+	channel := make(chan *xdp.Frame, internal.QUEUE_SIZE)
+	//outbound.queues[sock.GetMac()] = channel
+	//outbound.sockets[sock.GetMac()] = sock
+	go outbound.send(channel, sock)
 }
 
 func (outbound *Outbound) receive() {
 
 	for {
 		select {
-		case <-outbound.ctx:
-			return
 		case frame := <-outbound.gateway:
-			outbound.queue <- frame
+			outbound.queues[frame.MacDestination] <- frame
 		}
 	}
 }
 
-func (outbound *Outbound) send() {
+func (outbound *Outbound) send(queue chan *xdp.Frame, sock *proxy.ProxySocket) {
 	for {
 		select {
-		case <-outbound.ctx:
-			return
+		case frame := <-queue:
+			batchSize := len(queue)
+			frames := make([]*xdp.Frame, 0, batchSize+1)
 
-		case frame := <-outbound.queue:
+			frames = append(frames, frame)
 
-			if err := syscall.Sendto(outbound.fd, frame.FramePointer, 0, outbound.addr); err != nil {
-				internal.ShutdownAndLog(err)
-				continue
+			for i := 1; i < batchSize; i++ {
+				frames = append(frames, <-queue)
 			}
-
+			//sock.Send(frames)
 		}
 	}
 }
