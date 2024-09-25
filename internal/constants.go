@@ -8,13 +8,13 @@ import (
 	"syscall"
 )
 
-const GOB_QUEUESIZE = 10000
-const QUEUE_SIZE = 10000
+const QueueSize = 10000
 
 func init() {
 	Stop = make(chan os.Signal)
 	signal.Notify(Stop, os.Interrupt, syscall.SIGTERM)
 }
+
 func ShutdownAndLog(err error) {
 	fmt.Println(err)
 	debug.PrintStack()

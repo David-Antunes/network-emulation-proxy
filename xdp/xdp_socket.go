@@ -91,17 +91,17 @@ func (socket *XdpSock) Send(frames []*Frame) {
 
 func (socket *XdpSock) getTransmitDescs(number int) []xdp.Desc {
 	for len(socket.descs) < number {
-		_, _, err := socket.sock.Poll(-1)
-		if err != nil {
-			fmt.Println(err)
-			return socket.descs
-		}
 		socket.descs = socket.sock.GetDescs(socket.sock.NumFreeTxSlots(), false)
-		//fmt.Println("refill", len(socket.descs), number)
+
+		if len(socket.descs) < number {
+			_, _, err := socket.sock.Poll(-1)
+			if err != nil {
+				fmt.Println(err)
+			}
+		}
 	}
 	descs := socket.descs[:number]
 	socket.descs = socket.descs[number:]
-	//fmt.Println("give", len(socket.descs), number)
 	return descs
 }
 

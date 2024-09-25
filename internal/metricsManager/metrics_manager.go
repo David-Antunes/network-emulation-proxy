@@ -14,7 +14,6 @@ import (
 
 	"github.com/David-Antunes/network-emulation-proxy/api"
 	"github.com/David-Antunes/network-emulation-proxy/internal"
-	"github.com/David-Antunes/network-emulation-proxy/internal/conn"
 	"github.com/David-Antunes/network-emulation-proxy/xdp"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -33,7 +32,7 @@ type MetricsManager struct {
 	receiveLatency  time.Duration
 	transmitLatency time.Duration
 	tests           []api.RTTRequest
-	endpoint        *conn.RttConnection
+	endpoint        *RttConnection
 	metricsSocket   *MetricsSocket
 	timeout         time.Duration
 	numTests        int
@@ -41,7 +40,7 @@ type MetricsManager struct {
 
 var metricsLog = log.New(os.Stdout, "METRICS INFO: ", log.Ltime)
 
-func NewMetricsManager(iface xdp.Isocket, mac net.HardwareAddr, ip net.IP, port int, endpoint *conn.RttConnection, socketPath string, timeout time.Duration, numTests int) *MetricsManager {
+func NewMetricsManager(iface xdp.Isocket, mac net.HardwareAddr, ip net.IP, port int, endpoint *RttConnection, socketPath string, timeout time.Duration, numTests int) *MetricsManager {
 
 	fd, err := syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, int(htons(syscall.ETH_P_IP)))
 	if err != nil {

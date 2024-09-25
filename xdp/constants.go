@@ -11,15 +11,13 @@ import (
 const xdpFrameSize = 2048
 
 var DefaultSocketOptions = xdp.SocketOptions{
-	NumFrames:              8192,
+	NumFrames:              16384,
 	FrameSize:              xdpFrameSize,
-	FillRingNumDescs:       4096,
-	CompletionRingNumDescs: 4096,
-	RxRingNumDescs:         4096,
-	TxRingNumDescs:         4096,
+	FillRingNumDescs:       8192,
+	CompletionRingNumDescs: 8192,
+	RxRingNumDescs:         8192,
+	TxRingNumDescs:         8192,
 }
-
-//var DefaultXdpFlags = int(unix.XDP_FLAGS_SKB_MODE)
 
 func ConvertMacStringToBytes(macAddr string) []byte {
 	parts := strings.Split(macAddr, ":")

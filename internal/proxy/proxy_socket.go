@@ -2,15 +2,19 @@ package proxy
 
 import (
 	"encoding/gob"
+	"errors"
 	"fmt"
 	"github.com/David-Antunes/network-emulation-proxy/internal"
 	"github.com/David-Antunes/network-emulation-proxy/xdp"
 	ebpf "github.com/david-antunes/xdp"
 	"github.com/vishvananda/netlink"
+	"log"
 	"net"
 	"os"
 	"time"
 )
+
+var proxyLog = log.New(os.Stdout, "PROXY INFO: ", log.Ltime)
 
 type ProxySocket struct {
 	bpf        ebpf.Program
@@ -55,6 +59,7 @@ func NewProxySocket(queue int, iface string) (*ProxySocket, error) {
 		panic(err)
 	}
 
+	proxyLog.Println("New proxy socket in", iface)
 	return &ProxySocket{
 		bpf:        *program,
 		mac:        "",
@@ -66,7 +71,7 @@ func NewProxySocket(queue int, iface string) (*ProxySocket, error) {
 		socketPath: "",
 		listener:   nil,
 		conn:       nil,
-		queue:      make(chan *xdp.Frame, internal.QUEUE_SIZE),
+		queue:      make(chan *xdp.Frame, internal.QueueSize),
 	}, nil
 }
 
@@ -85,6 +90,7 @@ func (p *ProxySocket) Bootstrap() {
 			fmt.Println(err)
 			return
 		}
+		fmt.Println(p.link.Attrs().Name+":", "connection accepted")
 		p.enc = gob.NewEncoder(conn)
 		p.dec = gob.NewDecoder(conn)
 		go p.Transmit()
@@ -93,9 +99,17 @@ func (p *ProxySocket) Bootstrap() {
 }
 
 func (p *ProxySocket) CreateSocket() {
+	if p.mac == "" {
+		internal.ShutdownAndLog(errors.New("mac is nil"))
+		return
+	}
 	p.socketPath = "/tmp/" + p.mac + ".sock"
 	os.Remove(p.socketPath)
+
 	var err error
+
+	proxyLog.Println(p.link.Attrs().Name+":", p.socketPath)
+
 	p.listener, err = net.Listen("unix", p.socketPath)
 	if err != nil {
 		internal.ShutdownAndLog(err)
@@ -109,7 +123,8 @@ func (p *ProxySocket) FindMac() string {
 	numRx, _, err := p.sock.Poll(-1)
 
 	if err != nil {
-		internal.ShutdownAndLog(err)
+		p.Close()
+		return ""
 	}
 
 	rxDescs := p.sock.Receive(numRx)
@@ -117,15 +132,12 @@ func (p *ProxySocket) FindMac() string {
 		for i := 0; i < len(rxDescs); i++ {
 			framePointer := p.sock.GetFrame(rxDescs[i])
 			macOrig := string(framePointer[6:12])
-			if err != nil {
-				fmt.Println(err)
-			}
 			mac = macOrig
 		}
 		p.sock.Fill(rxDescs)
 	}
 	p.mac = net.HardwareAddr(mac).String()
-	fmt.Println("Found", p.mac)
+	proxyLog.Println(p.link.Attrs().Name+":", p.mac)
 	return mac
 }
 
@@ -135,7 +147,7 @@ func (p *ProxySocket) Receive(timeout int) {
 		numRx, _, err := p.sock.Poll(timeout)
 
 		if err != nil {
-			internal.ShutdownAndLog(err)
+			p.Close()
 		}
 
 		if numRx == 0 {
@@ -143,7 +155,6 @@ func (p *ProxySocket) Receive(timeout int) {
 		}
 
 		rxDescs := p.sock.Receive(numRx)
-		//fmt.Println(p.link.Attrs().Name, numRx)
 		if len(rxDescs) > 0 {
 			for i := 0; i < len(rxDescs); i++ {
 				framePointer := p.sock.GetFrame(rxDescs[i])
@@ -151,8 +162,10 @@ func (p *ProxySocket) Receive(timeout int) {
 				macOrig := string(framePointer[6:12])
 				frame := &xdp.Frame{FramePointer: framePointer[:int(rxDescs[i].Len)], FrameSize: int(rxDescs[i].Len), Time: time.Now(), MacOrigin: macOrig, MacDestination: macDest}
 				err = p.enc.Encode(&frame)
+
 				if err != nil {
-					internal.ShutdownAndLog(err)
+					proxyLog.Println(p.link.Attrs().Name, err)
+					return
 				}
 			}
 			p.sock.Fill(rxDescs)
@@ -166,7 +179,8 @@ func (p *ProxySocket) Transmit() {
 			var f *xdp.Frame
 			err := p.dec.Decode(&f)
 			if err != nil {
-				internal.ShutdownAndLog(err)
+				proxyLog.Println(p.link.Attrs().Name, err)
+				return
 			}
 			p.queue <- f
 		}
@@ -184,7 +198,6 @@ func (p *ProxySocket) Transmit() {
 				frames = append(frames, <-p.queue)
 			}
 			p.send(frames)
-			//fmt.Println("frame lenght", len(frames))
 		}
 	}
 }
@@ -213,13 +226,13 @@ func (p *ProxySocket) send(frames []*xdp.Frame) {
 
 func (p *ProxySocket) getTransmitDescs(number int) []ebpf.Desc {
 	for len(p.descs) < number {
-		//fmt.Println("Refill")
 		p.descs = p.sock.GetDescs(p.sock.NumFreeTxSlots(), false)
 
 		if len(p.descs) < number {
 			_, _, err := p.sock.Poll(1)
 			if err != nil {
-				fmt.Println(err)
+				proxyLog.Println(p.link.Attrs().Name, err)
+				p.Close()
 				return p.descs
 			}
 		} else {
@@ -228,20 +241,28 @@ func (p *ProxySocket) getTransmitDescs(number int) []ebpf.Desc {
 	}
 	descs := p.descs[:number]
 	p.descs = p.descs[number:]
-	//fmt.Println("descs", len(p.descs))
 	return descs
 }
 
 func (p *ProxySocket) Close() {
 	err := p.bpf.Detach(p.link.Attrs().Index)
 	if err != nil {
-		fmt.Println(err)
+		proxyLog.Println(p.link.Attrs().Name, err)
 	}
 	err = p.sock.Close()
 	if err != nil {
-		fmt.Println(err)
+		proxyLog.Println(p.link.Attrs().Name, err)
 	}
-	p.conn.Close()
-	p.listener.Close()
-	os.Remove(p.socketPath)
+	err = p.conn.Close()
+	if err != nil {
+		proxyLog.Println(p.link.Attrs().Name, err)
+	}
+	err = p.listener.Close()
+	if err != nil {
+		proxyLog.Println(p.link.Attrs().Name, err)
+	}
+	err = os.Remove(p.socketPath)
+	if err != nil {
+		proxyLog.Println(p.link.Attrs().Name, err)
+	}
 }

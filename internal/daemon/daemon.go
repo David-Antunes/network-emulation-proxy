@@ -77,11 +77,13 @@ func (d *Daemon) SearchInterfaces(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		internal.ShutdownAndLog(err)
+		d.Unlock()
 		return
 	}
 
 	if len(ifaces) == 1 {
 		internal.ShutdownAndLog(errors.New("something went wrong with the network"))
+		d.Unlock()
 		return
 	}
 
@@ -98,6 +100,7 @@ func (d *Daemon) SearchInterfaces(w http.ResponseWriter, r *http.Request) {
 		s, err := proxy.NewProxySocket(0, iface)
 		if err != nil {
 			internal.ShutdownAndLog(err)
+			d.Unlock()
 			return
 		}
 		d.proxySockets[iface] = s
@@ -106,12 +109,22 @@ func (d *Daemon) SearchInterfaces(w http.ResponseWriter, r *http.Request) {
 	d.Unlock()
 }
 
-func (d *Daemon) Cleanup() {
+func (d *Daemon) Close() {
 	for _, s := range d.proxySockets {
 		s.Close()
 	}
-	d.socket.Close()
-	d.httpServer.Close()
-	os.Remove(d.unixPath)
+	err := d.socket.Close()
+	if err != nil {
+		serverLog.Println(err)
+
+	}
+	err = d.httpServer.Close()
+	if err != nil {
+		serverLog.Println(err)
+	}
+	err = os.Remove(d.unixPath)
+	if err != nil {
+		serverLog.Println(err)
+	}
 	serverLog.Println("Closed")
 }

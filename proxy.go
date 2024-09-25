@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/David-Antunes/network-emulation-proxy/internal/conn"
 	"github.com/David-Antunes/network-emulation-proxy/internal/daemon"
 	"github.com/David-Antunes/network-emulation-proxy/internal/metricsManager"
 	"github.com/David-Antunes/network-emulation-proxy/xdp"
@@ -20,8 +19,7 @@ var proxyLog = log.New(os.Stdout, "PROXY INFO: ", log.Ltime)
 func cleanup(d *daemon.Daemon, m *metricsManager.MetricsManager) {
 	go func() {
 		<-internal.Stop
-		d.Cleanup()
-		//unixsocket.Close()
+		d.Close()
 		m.Close()
 		os.Exit(1)
 	}()
@@ -59,7 +57,7 @@ func main() {
 		panic(err)
 	}
 
-	rttConn := &conn.RttConnection{
+	rttConn := &metricsManager.RttConnection{
 		Mac:  []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
 		IP:   broadcastIP,
 		Port: 8000,
